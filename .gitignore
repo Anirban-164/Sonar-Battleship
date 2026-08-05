@@ -1,4 +1,4 @@
 .env
 *.pdf
-*.doc
+*.docx
 /venv
