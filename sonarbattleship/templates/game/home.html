@@ -1,0 +1,77 @@
+{% extends "game/base.html" %}
+{% block title %}Sonar Battleship — Home{% endblock %}
+
+{% block content %}
+<div class="home-container">
+    <h1>Sonar Battleship</h1>
+    <p class="subtitle">A DSP-powered naval warfare game</p>
+
+    {% if error %}
+    <div class="error-banner">{{ error }}</div>
+    {% endif %}
+
+    <div class="home-panels">
+        <!-- Create Room -->
+        <div class="panel">
+            <h2>Create a Room</h2>
+            <input type="text" id="create-name" placeholder="Your name" maxlength="30">
+            <button id="btn-create" onclick="createRoom()">Create Room</button>
+        </div>
+
+        <!-- Join Room -->
+        <div class="panel">
+            <h2>Join a Room</h2>
+            <input type="text" id="join-name" placeholder="Your name" maxlength="30">
+            <input type="text" id="join-code" placeholder="Room code" maxlength="6"
+                   style="text-transform: uppercase;">
+            <button id="btn-join" onclick="joinRoom()">Join Room</button>
+        </div>
+    </div>
+
+    <div id="home-error" class="error-text" style="display:none;"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function createRoom() {
+        const name = document.getElementById('create-name').value.trim() || 'Player 1';
+        const res = await fetch('/api/create-room/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name}),
+        });
+        const data = await res.json();
+        if (data.room_code) {
+            window.location.href = '/room/' + data.room_code + '/';
+        } else {
+            showError(data.error);
+        }
+    }
+
+    async function joinRoom() {
+        const name = document.getElementById('join-name').value.trim() || 'Player 2';
+        const code = document.getElementById('join-code').value.trim().toUpperCase();
+        if (!code) { showError('Enter a room code'); return; }
+
+        const res = await fetch('/api/join-room/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name, code}),
+        });
+        const data = await res.json();
+        if (data.room_code) {
+            window.location.href = '/room/' + data.room_code + '/';
+        } else {
+            showError(data.error);
+        }
+    }
+
+    function showError(msg) {
+        const el = document.getElementById('home-error');
+        el.textContent = msg;
+        el.style.display = 'block';
+        setTimeout(() => el.style.display = 'none', 4000);
+    }
+</script>
+{% endblock %}

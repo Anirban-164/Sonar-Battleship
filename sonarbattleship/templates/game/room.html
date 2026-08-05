@@ -1,0 +1,622 @@
+{% extends "game/base.html" %}
+{% block title %}Room {{ room_code }} — Sonar Battleship{% endblock %}
+
+{% block content %}
+<div class="room-container">
+    <!-- Header -->
+    <div class="room-header">
+        <h1>Room: <span id="room-code">{{ room_code }}</span></h1>
+        <div class="room-info">
+            <span id="status-badge" class="badge">Loading...</span>
+            <span id="turn-indicator"></span>
+        </div>
+    </div>
+
+    <!-- Waiting Phase -->
+    <div id="phase-waiting" class="phase" style="display:none;">
+        <div class="waiting-box">
+            <h2>Waiting for opponent...</h2>
+            <p>Share this room code with your opponent:</p>
+            <div class="code-display" onclick="navigator.clipboard.writeText('{{ room_code }}')">
+                {{ room_code }}
+                <small>(click to copy)</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Placement Phase -->
+    <div id="phase-placement" class="phase" style="display:none;">
+        <h2>Place Your Ships</h2>
+        <div class="placement-controls">
+            <div id="ship-picker">
+                <!-- Populated by JS -->
+            </div>
+            <button id="btn-rotate" onclick="rotateShip()">Rotate (R)</button>
+            <button id="btn-auto-place" onclick="autoPlace()">Auto-Place</button>
+            <button id="btn-confirm-placement" onclick="confirmPlacement()" disabled>
+                Confirm Placement
+            </button>
+        </div>
+        <div class="grid-wrapper">
+            <h3>Your Grid</h3>
+            <div id="placement-grid" class="grid"></div>
+        </div>
+    </div>
+
+    <!-- Waiting for opponent to place -->
+    <div id="phase-placement-wait" class="phase" style="display:none;">
+        <div class="waiting-box">
+            <h2>Ships placed!</h2>
+            <p>Waiting for your opponent to finish placing their ships...</p>
+        </div>
+    </div>
+
+    <!-- Game Phase -->
+    <div id="phase-game" class="phase" style="display:none;">
+        <div class="game-layout">
+            <!-- Left: My grid (defense view) -->
+            <div class="grid-section">
+                <h3>Your Fleet</h3>
+                <div id="my-grid" class="grid"></div>
+                <div id="my-ships-status" class="ships-status"></div>
+            </div>
+
+            <!-- Center: Action controls -->
+            <div class="action-section">
+                <div id="action-picker">
+                    <button id="btn-sonar" class="action-btn active" onclick="selectAction('sonar')">
+                        🔊 Sonar
+                    </button>
+                    <button id="btn-fire" class="action-btn" onclick="selectAction('fire')">
+                        💥 Fire
+                    </button>
+                </div>
+                <div id="action-result" class="result-panel" style="display:none;">
+                    <!-- Shows result of last action -->
+                </div>
+                <div id="sonar-log" class="sonar-log">
+                    <h4>Sonar Readings</h4>
+                    <ul id="sonar-readings"></ul>
+                </div>
+            </div>
+
+            <!-- Right: Enemy grid (attack view) -->
+            <div class="grid-section">
+                <h3>Enemy Waters</h3>
+                <div id="enemy-grid" class="grid"></div>
+                <div id="enemy-ships-status" class="ships-status"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Phase -->
+    <div id="phase-gameover" class="phase" style="display:none;">
+        <div class="gameover-box">
+            <h2 id="gameover-title"></h2>
+            <p id="gameover-message"></p>
+            <button onclick="window.location.href='/'">Play Again</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% load static %}
+<script>
+    // ============================================================
+    // Game state & config
+    // ============================================================
+    const ROOM_CODE = '{{ room_code }}';
+    const GRID_SIZE = {{ grid_size }};
+    const SHIP_FLEET = {{ ship_fleet|safe }};
+
+    let gameState = null;
+    let selectedAction = 'sonar';
+    let pollingInterval = null;
+
+    // Placement state
+    let currentShipIndex = 0;
+    let orientation = 'H';  // 'H' or 'V'
+    let placedShips = {};   // {shipName: {cells: [...], orientation: '...'}}
+    let placementLocked = false;
+
+    // ============================================================
+    // Polling
+    // ============================================================
+    function startPolling() {
+        pollState();  // immediate first call
+        pollingInterval = setInterval(pollState, 2500);
+    }
+
+    async function pollState() {
+        try {
+            const res = await fetch(`/api/room-state/${ROOM_CODE}/`);
+            if (!res.ok) return;
+            gameState = await res.json();
+            updateUI();
+        } catch (e) {
+            console.error('Polling error:', e);
+        }
+    }
+
+    // ============================================================
+    // UI Updates
+    // ============================================================
+    function updateUI() {
+        if (!gameState) return;
+
+        // Update status badge
+        const badge = document.getElementById('status-badge');
+        badge.textContent = gameState.status.replace('_', ' ').toUpperCase();
+        badge.className = 'badge badge-' + gameState.status;
+
+        // Hide all phases
+        document.querySelectorAll('.phase').forEach(el => el.style.display = 'none');
+
+        switch (gameState.status) {
+            case 'waiting':
+                document.getElementById('phase-waiting').style.display = 'block';
+                break;
+            case 'placement':
+                if (gameState.my_ships.length > 0) {
+                    // I've already placed, waiting for opponent
+                    document.getElementById('phase-placement-wait').style.display = 'block';
+                } else if (!placementLocked) {
+                    document.getElementById('phase-placement').style.display = 'block';
+                    initPlacementGrid();
+                    initShipPicker();
+                }
+                break;
+            case 'in_progress':
+                document.getElementById('phase-game').style.display = 'block';
+                updateGameGrids();
+                updateTurnIndicator();
+                break;
+            case 'finished':
+                document.getElementById('phase-gameover').style.display = 'block';
+                showGameOver();
+                break;
+        }
+    }
+
+    // ============================================================
+    // Grid rendering
+    // ============================================================
+    function createGrid(containerId, size, onClick) {
+        const container = document.getElementById(containerId);
+        if (container.children.length > 0) return; // already built
+
+        container.style.gridTemplateColumns = `repeat(${size + 1}, 1fr)`;
+
+        // Corner cell
+        const corner = document.createElement('div');
+        corner.className = 'grid-cell grid-header';
+        container.appendChild(corner);
+
+        // Column headers
+        for (let c = 0; c < size; c++) {
+            const header = document.createElement('div');
+            header.className = 'grid-cell grid-header';
+            header.textContent = c;
+            container.appendChild(header);
+        }
+
+        // Rows
+        for (let r = 0; r < size; r++) {
+            // Row header
+            const rowHeader = document.createElement('div');
+            rowHeader.className = 'grid-cell grid-header';
+            rowHeader.textContent = String.fromCharCode(65 + r); // A, B, C...
+            container.appendChild(rowHeader);
+
+            for (let c = 0; c < size; c++) {
+                const cell = document.createElement('div');
+                cell.className = 'grid-cell';
+                cell.dataset.row = r;
+                cell.dataset.col = c;
+                cell.id = `${containerId}-${r}-${c}`;
+                if (onClick) {
+                    cell.addEventListener('click', () => onClick(r, c));
+                    cell.addEventListener('mouseenter', () => onCellHover(containerId, r, c));
+                    cell.addEventListener('mouseleave', () => onCellLeave(containerId, r, c));
+                }
+                container.appendChild(cell);
+            }
+        }
+    }
+
+    // ============================================================
+    // Placement logic
+    // ============================================================
+    let placementGridBuilt = false;
+
+    function initPlacementGrid() {
+        if (placementGridBuilt) return;
+        createGrid('placement-grid', GRID_SIZE, onPlacementClick);
+        placementGridBuilt = true;
+    }
+
+    function initShipPicker() {
+        const picker = document.getElementById('ship-picker');
+        if (picker.children.length > 0) return;
+
+        SHIP_FLEET.forEach((ship, i) => {
+            const btn = document.createElement('button');
+            btn.id = `ship-btn-${i}`;
+            btn.className = 'ship-btn' + (i === 0 ? ' active' : '');
+            btn.textContent = `${ship.name} (${ship.size})`;
+            btn.onclick = () => selectShip(i);
+
+            if (placedShips[ship.name]) {
+                btn.classList.add('placed');
+            }
+            picker.appendChild(btn);
+        });
+    }
+
+    function selectShip(index) {
+        currentShipIndex = index;
+        document.querySelectorAll('.ship-btn').forEach((btn, i) => {
+            btn.classList.toggle('active', i === index);
+        });
+    }
+
+    function rotateShip() {
+        orientation = orientation === 'H' ? 'V' : 'H';
+        document.getElementById('btn-rotate').textContent =
+            `Rotate (R) — ${orientation === 'H' ? 'Horizontal' : 'Vertical'}`;
+    }
+
+    // Listen for 'R' key to rotate
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'r' || e.key === 'R') rotateShip();
+    });
+
+    function getShipCells(startRow, startCol, size, orient) {
+        const cells = [];
+        for (let i = 0; i < size; i++) {
+            const r = orient === 'V' ? startRow + i : startRow;
+            const c = orient === 'H' ? startCol + i : startCol;
+            if (r >= GRID_SIZE || c >= GRID_SIZE) return null; // out of bounds
+            cells.push([r, c]);
+        }
+        return cells;
+    }
+
+    function onCellHover(containerId, row, col) {
+        if (containerId !== 'placement-grid' || placementLocked) return;
+        const ship = SHIP_FLEET[currentShipIndex];
+        if (placedShips[ship.name]) return;
+
+        const cells = getShipCells(row, col, ship.size, orientation);
+        if (!cells) return;
+
+        const overlaps = checkPlacementOverlap(cells);
+        cells.forEach(([r, c]) => {
+            const cell = document.getElementById(`placement-grid-${r}-${c}`);
+            if (cell) cell.classList.add(overlaps ? 'hover-invalid' : 'hover-valid');
+        });
+    }
+
+    function onCellLeave(containerId, row, col) {
+        if (containerId !== 'placement-grid') return;
+        document.querySelectorAll('.hover-valid, .hover-invalid').forEach(el => {
+            el.classList.remove('hover-valid', 'hover-invalid');
+        });
+    }
+
+    function checkPlacementOverlap(cells) {
+        const occupied = new Set();
+        Object.values(placedShips).forEach(s => {
+            s.cells.forEach(([r, c]) => occupied.add(`${r},${c}`));
+        });
+        return cells.some(([r, c]) => occupied.has(`${r},${c}`));
+    }
+
+    function onPlacementClick(row, col) {
+        if (placementLocked) return;
+        const ship = SHIP_FLEET[currentShipIndex];
+        if (placedShips[ship.name]) return; // already placed
+
+        const cells = getShipCells(row, col, ship.size, orientation);
+        if (!cells) return; // out of bounds
+        if (checkPlacementOverlap(cells)) return; // overlapping
+
+        // Place the ship
+        placedShips[ship.name] = {cells, orientation};
+
+        // Render on grid
+        cells.forEach(([r, c]) => {
+            const cell = document.getElementById(`placement-grid-${r}-${c}`);
+            cell.classList.add('ship-cell');
+            cell.textContent = ship.name[0]; // First letter
+        });
+
+        // Mark as placed in picker
+        const btn = document.getElementById(`ship-btn-${currentShipIndex}`);
+        btn.classList.add('placed');
+
+        // Auto-advance to next unplaced ship
+        const nextIndex = SHIP_FLEET.findIndex((s, i) => i > currentShipIndex && !placedShips[s.name]);
+        if (nextIndex !== -1) selectShip(nextIndex);
+
+        // Enable confirm if all placed
+        if (Object.keys(placedShips).length === SHIP_FLEET.length) {
+            document.getElementById('btn-confirm-placement').disabled = false;
+        }
+    }
+
+    function autoPlace() {
+        // Clear existing placements
+        placedShips = {};
+        document.querySelectorAll('.ship-cell').forEach(el => {
+            el.classList.remove('ship-cell');
+            el.textContent = '';
+        });
+        document.querySelectorAll('.ship-btn').forEach(btn => btn.classList.remove('placed'));
+
+        // Random placement
+        SHIP_FLEET.forEach((ship, index) => {
+            let placed = false;
+            let attempts = 0;
+            while (!placed && attempts < 200) {
+                attempts++;
+                const orient = Math.random() < 0.5 ? 'H' : 'V';
+                const maxR = orient === 'V' ? GRID_SIZE - ship.size : GRID_SIZE - 1;
+                const maxC = orient === 'H' ? GRID_SIZE - ship.size : GRID_SIZE - 1;
+                const r = Math.floor(Math.random() * (maxR + 1));
+                const c = Math.floor(Math.random() * (maxC + 1));
+
+                const cells = getShipCells(r, c, ship.size, orient);
+                if (cells && !checkPlacementOverlap(cells)) {
+                    placedShips[ship.name] = {cells, orientation: orient};
+
+                    cells.forEach(([cr, cc]) => {
+                        const cell = document.getElementById(`placement-grid-${cr}-${cc}`);
+                        cell.classList.add('ship-cell');
+                        cell.textContent = ship.name[0];
+                    });
+
+                    const btn = document.getElementById(`ship-btn-${index}`);
+                    btn.classList.add('placed');
+                    placed = true;
+                }
+            }
+        });
+
+        if (Object.keys(placedShips).length === SHIP_FLEET.length) {
+            document.getElementById('btn-confirm-placement').disabled = false;
+        }
+    }
+
+    async function confirmPlacement() {
+        placementLocked = true;
+        const ships = SHIP_FLEET.map(ship => ({
+            name: ship.name,
+            cells: placedShips[ship.name].cells,
+            orientation: placedShips[ship.name].orientation,
+        }));
+
+        const res = await fetch(`/api/place-ships/${ROOM_CODE}/`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ships}),
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            // Switch to waiting-for-opponent view
+            document.getElementById('phase-placement').style.display = 'none';
+            document.getElementById('phase-placement-wait').style.display = 'block';
+        } else {
+            placementLocked = false;
+            alert('Placement error: ' + data.error);
+        }
+    }
+
+    // ============================================================
+    // Game phase — grids & actions
+    // ============================================================
+    let myGridBuilt = false;
+    let enemyGridBuilt = false;
+
+    function updateGameGrids() {
+        if (!myGridBuilt) {
+            createGrid('my-grid', GRID_SIZE, null);
+            myGridBuilt = true;
+        }
+        if (!enemyGridBuilt) {
+            createGrid('enemy-grid', GRID_SIZE, onEnemyGridClick);
+            enemyGridBuilt = true;
+        }
+
+        // Render my ships on my grid
+        if (gameState.my_ships) {
+            // Clear previous state
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const cell = document.getElementById(`my-grid-${r}-${c}`);
+                    cell.className = 'grid-cell';
+                    cell.textContent = '';
+                }
+            }
+
+            gameState.my_ships.forEach(ship => {
+                ship.cells.forEach(([r, c]) => {
+                    const cell = document.getElementById(`my-grid-${r}-${c}`);
+                    cell.classList.add('ship-cell');
+                    if (ship.hit_cells.some(h => h[0] === r && h[1] === c)) {
+                        cell.classList.add('cell-hit');
+                        cell.textContent = '🔥';
+                    }
+                    if (ship.is_sunk) {
+                        cell.classList.add('cell-sunk');
+                    }
+                });
+            });
+        }
+
+        // Render attack results on enemy grid
+        if (gameState.my_actions) {
+            gameState.my_actions.forEach(action => {
+                const [r, c] = action.target;
+                const cell = document.getElementById(`enemy-grid-${r}-${c}`);
+                if (!cell) return;
+
+                if (action.type === 'fire' && action.result) {
+                    if (action.result.hit) {
+                        cell.classList.add('cell-hit');
+                        cell.textContent = '💥';
+                    } else {
+                        cell.classList.add('cell-miss');
+                        cell.textContent = '•';
+                    }
+                } else if (action.type === 'sonar') {
+                    cell.classList.add('cell-sonar');
+                    cell.textContent = '◎';
+                }
+            });
+        }
+
+        // Show sunk enemy ships fully
+        if (gameState.enemy_ships) {
+            gameState.enemy_ships.forEach(ship => {
+                if (ship.is_sunk && ship.cells) {
+                    ship.cells.forEach(([r, c]) => {
+                        const cell = document.getElementById(`enemy-grid-${r}-${c}`);
+                        cell.classList.add('cell-sunk');
+                    });
+                }
+            });
+        }
+
+        // Update ship status displays
+        updateShipStatus('my-ships-status', gameState.my_ships, true);
+        updateShipStatus('enemy-ships-status', gameState.enemy_ships, false);
+
+        // Update sonar log
+        updateSonarLog();
+    }
+
+    function updateShipStatus(containerId, ships, isMine) {
+        const container = document.getElementById(containerId);
+        if (!ships) return;
+
+        container.innerHTML = ships.map(ship => {
+            const name = isMine ? ship.name : (ship.is_sunk ? ship.name : '???');
+            const hitCount = ship.hit_cells ? ship.hit_cells.length : 0;
+            const total = ship.size || '?';
+            const sunkClass = ship.is_sunk ? 'sunk' : '';
+            return `<span class="ship-status ${sunkClass}">${name} ${ship.is_sunk ? '✖' : `(${hitCount}/${total})`}</span>`;
+        }).join('');
+    }
+
+    function updateSonarLog() {
+        const list = document.getElementById('sonar-readings');
+        if (!gameState.my_actions) return;
+
+        const sonarActions = gameState.my_actions.filter(a => a.type === 'sonar');
+        list.innerHTML = sonarActions.map(a => {
+            const [r, c] = a.target;
+            const cellName = `${String.fromCharCode(65 + r)}${c}`;
+            if (a.result && a.result.contact) {
+                return `<li class="sonar-contact">📡 ${cellName} → ${a.result.distance} cells away</li>`;
+            } else {
+                return `<li class="sonar-empty">📡 ${cellName} → No contact</li>`;
+            }
+        }).join('');
+    }
+
+    function updateTurnIndicator() {
+        const indicator = document.getElementById('turn-indicator');
+        if (gameState.is_my_turn) {
+            indicator.textContent = '🟢 Your Turn';
+            indicator.className = 'turn-mine';
+        } else {
+            indicator.textContent = '🔴 Opponent\'s Turn';
+            indicator.className = 'turn-opponent';
+        }
+    }
+
+    function selectAction(type) {
+        selectedAction = type;
+        document.getElementById('btn-sonar').classList.toggle('active', type === 'sonar');
+        document.getElementById('btn-fire').classList.toggle('active', type === 'fire');
+    }
+
+    async function onEnemyGridClick(row, col) {
+        if (!gameState || !gameState.is_my_turn) return;
+        if (gameState.status !== 'in_progress') return;
+
+        const res = await fetch(`/api/action/${ROOM_CODE}/`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                action_type: selectedAction,
+                target_row: row,
+                target_col: col,
+            }),
+        });
+        const data = await res.json();
+
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+
+        // Show result briefly
+        showActionResult(selectedAction, row, col, data.result);
+
+        // Immediately poll for updated state
+        pollState();
+    }
+
+    function showActionResult(type, row, col, result) {
+        const panel = document.getElementById('action-result');
+        const cellName = `${String.fromCharCode(65 + row)}${col}`;
+        panel.style.display = 'block';
+
+        if (type === 'fire') {
+            if (result.hit) {
+                panel.innerHTML = `<div class="result-hit">💥 HIT at ${cellName}!${result.sunk ? ' — SUNK ' + result.ship_name + '!' : ''}</div>`;
+            } else {
+                panel.innerHTML = `<div class="result-miss">💨 Miss at ${cellName}</div>`;
+            }
+        } else {
+            if (result.contact) {
+                panel.innerHTML = `<div class="result-sonar">📡 Contact! ~${result.distance} cells from ${cellName}</div>`;
+            } else {
+                panel.innerHTML = `<div class="result-sonar">📡 No contact from ${cellName}</div>`;
+            }
+        }
+
+        setTimeout(() => { panel.style.display = 'none'; }, 4000);
+    }
+
+    // ============================================================
+    // Game Over
+    // ============================================================
+    function showGameOver() {
+        if (!gameState) return;
+
+        const title = document.getElementById('gameover-title');
+        const msg = document.getElementById('gameover-message');
+
+        if (gameState.winner === gameState.my_id) {
+            title.textContent = '🏆 Victory!';
+            msg.textContent = 'You sank all enemy ships!';
+        } else {
+            title.textContent = '💀 Defeat';
+            msg.textContent = 'All your ships have been sunk.';
+        }
+
+        // Stop polling
+        if (pollingInterval) clearInterval(pollingInterval);
+    }
+
+    // ============================================================
+    // Init
+    // ============================================================
+    startPolling();
+</script>
+{% endblock %}
