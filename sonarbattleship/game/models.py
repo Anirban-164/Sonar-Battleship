@@ -15,7 +15,7 @@ class Room(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     code = models.CharField(max_length=6, unique=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='waiting')
-    grid_size = models.IntegerField(default=10)
+    grid_size = models.IntegerField(default=15)
     current_turn = models.ForeignKey(
         'Player', null=True, blank=True,
         on_delete=models.SET_NULL, related_name='turn_room'
@@ -60,7 +60,6 @@ class Ship(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     player = models.ForeignKey(Player, on_delete=models.CASCADE, related_name='ships')
-    ship_name = models.CharField(max_length=20)
     size = models.IntegerField()
     cells = models.JSONField()         # [[row, col], [row, col], ...]
     orientation = models.CharField(max_length=1, choices=ORIENTATION_CHOICES, default='H')
@@ -72,7 +71,7 @@ class Ship(models.Model):
         managed = False
 
     def __str__(self):
-        return f"{self.ship_name} ({self.player.name})"
+        return f"({self.player.name})"
 
 
 class Action(models.Model):

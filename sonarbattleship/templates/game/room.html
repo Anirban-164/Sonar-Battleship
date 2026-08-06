@@ -108,7 +108,7 @@
     // ============================================================
     const ROOM_CODE = '{{ room_code }}';
     const GRID_SIZE = {{ grid_size }};
-    const SHIP_FLEET = {{ ship_fleet|safe }};
+    const SHIP_FLEET = {{ ship_fleet| safe }};
 
     let gameState = null;
     let selectedAction = 'sonar';
@@ -117,7 +117,7 @@
     // Placement state
     let currentShipIndex = 0;
     let orientation = 'H';  // 'H' or 'V'
-    let placedShips = {};   // {shipName: {cells: [...], orientation: '...'}}
+    let placedShips = {};   // {shipIndex: {cells: [...], orientation: '...'}}
     let placementLocked = false;
 
     // ============================================================
@@ -244,10 +244,10 @@
             const btn = document.createElement('button');
             btn.id = `ship-btn-${i}`;
             btn.className = 'ship-btn' + (i === 0 ? ' active' : '');
-            btn.textContent = `${ship.name} (${ship.size})`;
+            btn.textContent = `Submarine (${ship.size})`;
             btn.onclick = () => selectShip(i);
 
-            if (placedShips[ship.name]) {
+            if (placedShips[i]) {
                 btn.classList.add('placed');
             }
             picker.appendChild(btn);
@@ -286,7 +286,7 @@
     function onCellHover(containerId, row, col) {
         if (containerId !== 'placement-grid' || placementLocked) return;
         const ship = SHIP_FLEET[currentShipIndex];
-        if (placedShips[ship.name]) return;
+        if (placedShips[currentShipIndex]) return;
 
         const cells = getShipCells(row, col, ship.size, orientation);
         if (!cells) return;
@@ -316,20 +316,20 @@
     function onPlacementClick(row, col) {
         if (placementLocked) return;
         const ship = SHIP_FLEET[currentShipIndex];
-        if (placedShips[ship.name]) return; // already placed
+        if (placedShips[currentShipIndex]) return; // already placed
 
         const cells = getShipCells(row, col, ship.size, orientation);
         if (!cells) return; // out of bounds
         if (checkPlacementOverlap(cells)) return; // overlapping
 
         // Place the ship
-        placedShips[ship.name] = {cells, orientation};
+        placedShips[currentShipIndex] = { cells, orientation };
 
         // Render on grid
         cells.forEach(([r, c]) => {
             const cell = document.getElementById(`placement-grid-${r}-${c}`);
             cell.classList.add('ship-cell');
-            cell.textContent = ship.name[0]; // First letter
+            cell.textContent = 'S'; // First letter of Submarine
         });
 
         // Mark as placed in picker
@@ -337,7 +337,7 @@
         btn.classList.add('placed');
 
         // Auto-advance to next unplaced ship
-        const nextIndex = SHIP_FLEET.findIndex((s, i) => i > currentShipIndex && !placedShips[s.name]);
+        const nextIndex = SHIP_FLEET.findIndex((s, i) => i > currentShipIndex && !placedShips[i]);
         if (nextIndex !== -1) selectShip(nextIndex);
 
         // Enable confirm if all placed
@@ -369,12 +369,12 @@
 
                 const cells = getShipCells(r, c, ship.size, orient);
                 if (cells && !checkPlacementOverlap(cells)) {
-                    placedShips[ship.name] = {cells, orientation: orient};
+                    placedShips[index] = { cells, orientation: orient };
 
                     cells.forEach(([cr, cc]) => {
                         const cell = document.getElementById(`placement-grid-${cr}-${cc}`);
                         cell.classList.add('ship-cell');
-                        cell.textContent = ship.name[0];
+                        cell.textContent = 'S';
                     });
 
                     const btn = document.getElementById(`ship-btn-${index}`);
@@ -391,16 +391,16 @@
 
     async function confirmPlacement() {
         placementLocked = true;
-        const ships = SHIP_FLEET.map(ship => ({
-            name: ship.name,
-            cells: placedShips[ship.name].cells,
-            orientation: placedShips[ship.name].orientation,
+        const ships = SHIP_FLEET.map((ship, index) => ({
+            size: ship.size,
+            cells: placedShips[index].cells,
+            orientation: placedShips[index].orientation,
         }));
 
         const res = await fetch(`/api/place-ships/${ROOM_CODE}/`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ships}),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ships }),
         });
         const data = await res.json();
 
@@ -550,7 +550,7 @@
 
         const res = await fetch(`/api/action/${ROOM_CODE}/`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 action_type: selectedAction,
                 target_row: row,

@@ -125,9 +125,10 @@ STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 
 # Default primary key field type
-# https://docs.djangoproject.com/en/6.0/ref/settings/#default-auto-field
-
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Allow cross-device access during development
+ALLOWED_HOSTS = ['*']
 
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8000',
@@ -137,3 +138,9 @@ CSRF_TRUSTED_ORIGINS = [
 # Session config — players are identified by session, not login
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 SESSION_COOKIE_AGE = 86400  # 24 hours
+
+# Static files
+STATICFILES_DIRS = [BASE_DIR / 'static']
+
+# Templates directory
+TEMPLATES[0]['DIRS'] = [BASE_DIR / 'templates']
