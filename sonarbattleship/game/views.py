@@ -14,14 +14,12 @@ from game.models import Room, Player, Ship, Action
 # Ship config — classic Battleship fleet
 # ============================================================
 SHIP_FLEET = [
-    {'name': 'Carrier',    'size': 5},
-    {'name': 'Battleship', 'size': 4},
-    {'name': 'Destroyer',  'size': 3},
-    {'name': 'Submarine',  'size': 3},
-    {'name': 'Patrol',     'size': 2},
+    {'size': 5},
+    {'size': 4},
+    {'size': 3}
 ]
 
-GRID_SIZE = 10  # 10x10 grid
+GRID_SIZE = 15  # 15x15 grid, matches DB default
 
 
 # ============================================================
@@ -148,7 +146,7 @@ def _process_fire(target_row, target_col, enemy_player):
 
                 return {
                     "hit": True,
-                    "ship_name": ship.ship_name,
+                    "ship_name": "Submarine",
                     "sunk": ship.is_sunk
                 }
 
@@ -286,7 +284,7 @@ def api_room_state(request, room_code):
     my_ships = []
     for s in Ship.objects.filter(player=me):
         my_ships.append({
-            'name': s.ship_name,
+            'name': f"Submarine ({s.size})",
             'size': s.size,
             'cells': s.cells,
             'hit_cells': s.hit_cells,
@@ -298,7 +296,7 @@ def api_room_state(request, room_code):
     if enemy:
         for s in Ship.objects.filter(player=enemy):
             ship_data = {
-                'name': s.ship_name if s.is_sunk else '???',
+                'name': f"Submarine ({s.size})" if s.is_sunk else '???',
                 'size': s.size if s.is_sunk else None,
                 'cells': s.cells if s.is_sunk else None,
                 'hit_cells': s.hit_cells,  # show where you've hit
@@ -365,11 +363,11 @@ def api_place_ships(request, room_code):
     ships_data = data.get('ships', [])
 
     # Validate fleet composition
-    expected_names = {s['name'] for s in SHIP_FLEET}
-    submitted_names = {s['name'] for s in ships_data}
-    if expected_names != submitted_names:
+    expected_sizes = sorted([s['size'] for s in SHIP_FLEET])
+    submitted_sizes = sorted([s['size'] for s in ships_data])
+    if expected_sizes != submitted_sizes:
         return JsonResponse({
-            'error': f'Invalid fleet. Expected: {sorted(expected_names)}'
+            'error': f'Invalid fleet sizes. Expected: {expected_sizes}'
         }, status=400)
 
     # Validate and create each ship
@@ -377,17 +375,16 @@ def api_place_ships(request, room_code):
     all_cells = []  # track all placed cells for overlap checking
 
     for ship_data in ships_data:
-        # Find the expected size
-        expected = next(s for s in SHIP_FLEET if s['name'] == ship_data['name'])
         cells = [list(c) for c in ship_data['cells']]
+        size = ship_data['size']
 
         # Validate placement
-        valid, error = _validate_ship_placement(cells, expected['size'], room.grid_size)
+        valid, error = _validate_ship_placement(cells, size, room.grid_size)
         if not valid:
             # Rollback any created ships
             Ship.objects.filter(id__in=[s.id for s in created_ships]).delete()
             return JsonResponse({
-                'error': f"{ship_data['name']}: {error}"
+                'error': f"Ship of size {size}: {error}"
             }, status=400)
 
         # Check overlap with already-placed ships in this submission
@@ -395,14 +392,13 @@ def api_place_ships(request, room_code):
             if tuple(cell) in [(c[0], c[1]) for c in all_cells]:
                 Ship.objects.filter(id__in=[s.id for s in created_ships]).delete()
                 return JsonResponse({
-                    'error': f"{ship_data['name']} overlaps with another ship"
+                    'error': f"Ship of size {size} overlaps with another ship"
                 }, status=400)
             all_cells.append(cell)
 
         ship = Ship.objects.create(
             player=me,
-            ship_name=ship_data['name'],
-            size=expected['size'],
+            size=size,
             cells=cells,
             orientation=ship_data.get('orientation', 'H'),
         )

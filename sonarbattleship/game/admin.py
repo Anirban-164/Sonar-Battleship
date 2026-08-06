@@ -15,7 +15,7 @@ class PlayerAdmin(admin.ModelAdmin):
 
 @admin.register(Ship)
 class ShipAdmin(admin.ModelAdmin):
-    list_display = ('ship_name', 'player', 'size', 'is_sunk')
+    list_display = ('player', 'size', 'is_sunk')
 
 
 @admin.register(Action)
