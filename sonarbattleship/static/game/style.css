@@ -60,13 +60,13 @@ button:disabled { background: #37474f; cursor: not-allowed; }
 .error-text { color: #ef5350; margin-top: 12px; }
 
 /* === Room === */
-.room-container { max-width: 1200px; margin: 20px auto; padding: 0 16px; }
+.room-container { max-width: 1400px; margin: 20px auto; padding: 0 16px; }
 .room-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
-    padding-bottom: 12px;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
     border-bottom: 1px solid #2a3040;
 }
 .room-header h1 { font-size: 1.4rem; color: #4fc3f7; }
@@ -87,7 +87,7 @@ button:disabled { background: #37474f; cursor: not-allowed; }
 .turn-mine { color: #66bb6a; font-weight: bold; }
 .turn-opponent { color: #ef5350; }
 
-/* === Waiting === */
+/* === Waiting & Game Over === */
 .waiting-box, .gameover-box {
     text-align: center;
     padding: 40px;
@@ -108,8 +108,10 @@ button:disabled { background: #37474f; cursor: not-allowed; }
     letter-spacing: 8px;
 }
 .code-display small { display: block; font-size: 0.7rem; color: #78909c; letter-spacing: 0; }
+.gameover-box h2 { font-size: 2rem; margin-bottom: 12px; }
+.gameover-box button { margin-top: 20px; padding: 12px 32px; font-size: 1.1rem; }
 
-/* === Grid === */
+/* === Placement Grid (single grid) === */
 .grid {
     display: inline-grid;
     gap: 2px;
@@ -118,26 +120,26 @@ button:disabled { background: #37474f; cursor: not-allowed; }
     border-radius: 8px;
 }
 .grid-cell {
-    width: 36px;
-    height: 36px;
+    width: 28px;
+    height: 28px;
     background: #0d1117;
     border: 1px solid #1e2733;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     cursor: pointer;
     transition: background 0.15s;
-    border-radius: 3px;
+    border-radius: 2px;
 }
 .grid-cell:hover { background: #1a2332; }
 .grid-header {
-    background: transparent;
-    border: none;
+    background: transparent !important;
+    border: none !important;
     color: #546e7a;
     font-weight: bold;
     cursor: default;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
 }
 .ship-cell { background: #1565c0 !important; }
 .hover-valid { background: #2e7d32 !important; opacity: 0.7; }
@@ -145,9 +147,7 @@ button:disabled { background: #37474f; cursor: not-allowed; }
 .cell-hit { background: #c62828 !important; }
 .cell-miss { background: #263238 !important; color: #546e7a; }
 .cell-sunk { background: #4a0000 !important; opacity: 0.6; }
-.cell-sonar { background: #1b5e20 !important; }
 
-/* === Placement === */
 .placement-controls {
     display: flex;
     gap: 10px;
@@ -165,35 +165,192 @@ button:disabled { background: #37474f; cursor: not-allowed; }
 .grid-wrapper { margin-top: 12px; }
 .grid-wrapper h3 { margin-bottom: 8px; color: #78909c; }
 
-/* === Game Layout === */
-.game-layout {
+/* === Game Phase — Top Bar === */
+.game-top-bar {
     display: flex;
-    gap: 24px;
-    flex-wrap: wrap;
-    justify-content: center;
-}
-.grid-section { text-align: center; }
-.grid-section h3 { margin-bottom: 8px; color: #78909c; }
-.action-section {
-    display: flex;
-    flex-direction: column;
+    justify-content: space-between;
     align-items: center;
-    gap: 12px;
-    min-width: 180px;
+    margin-bottom: 12px;
+    gap: 16px;
+    flex-wrap: wrap;
 }
 
-/* === Action Picker === */
-#action-picker { display: flex; gap: 8px; }
+.turn-bar {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    letter-spacing: 0.5px;
+}
+.turn-bar-mine { background: rgba(46, 125, 50, 0.2); color: #66bb6a; border: 1px solid #2e7d32; }
+.turn-bar-opponent { background: rgba(183, 28, 28, 0.2); color: #ef5350; border: 1px solid #b71c1c; }
+
+.action-picker { display: flex; gap: 8px; }
 .action-btn {
     padding: 10px 20px;
     background: #263238;
     font-size: 1rem;
+    border-radius: 8px;
 }
-.action-btn.active { background: #1976d2; box-shadow: 0 0 10px rgba(25, 118, 210, 0.4); }
+.action-btn.active {
+    background: #1976d2;
+    box-shadow: 0 0 12px rgba(25, 118, 210, 0.4);
+}
+
+/* === Combined Grid === */
+.combined-grid-wrapper {
+    text-align: center;
+    margin-bottom: 16px;
+    overflow-x: auto;
+}
+
+.grid-labels {
+    display: flex;
+    justify-content: center;
+    gap: 0;
+    margin-bottom: 6px;
+}
+.grid-label-left, .grid-label-right {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 4px 0;
+}
+.grid-label-left {
+    color: #4fc3f7;
+    /* Offset for row header (30px) + half grid */
+    margin-left: 30px;
+    flex: 1;
+    text-align: center;
+}
+.grid-label-right {
+    color: #ef5350;
+    margin-right: 0;
+    flex: 1;
+    text-align: center;
+}
+
+.combined-grid {
+    display: inline-grid;
+    gap: 2px;
+    background: #1a1f2e;
+    padding: 4px;
+    border-radius: 8px;
+}
+
+/* Divider column between player and enemy halves */
+.grid-divider-cell {
+    background: #4fc3f7;
+    opacity: 0.3;
+    border: none;
+    width: 4px;
+    border-radius: 2px;
+}
+.grid-divider-header {
+    background: transparent;
+    border: none;
+    width: 4px;
+}
+
+/* Player cells (left half) */
+.player-cell {
+    background: #0d1117;
+    border: 1px solid #1a2636;
+}
+.player-cell:hover {
+    background: #0d1117; /* no hover effect on own grid */
+    cursor: default;
+}
+
+/* Enemy cells (right half) */
+.enemy-cell {
+    background: #0f1318;
+    border: 1px solid #1e2733;
+}
+.enemy-cell:hover {
+    background: #1a2842;
+    cursor: crosshair;
+}
+
+/* === Game Bottom Panel === */
+.game-bottom-panel {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 16px;
+}
+
+/* === Sonar Controls === */
+.sonar-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    background: #1a1f2e;
+    border: 1px solid #2a3040;
+    border-radius: 12px;
+    padding: 16px;
+    min-width: 220px;
+}
+
+.angle-picker-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.angle-readout {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+.angle-readout input {
+    width: 60px;
+    padding: 6px 8px;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #4fc3f7;
+    font-size: 1.1rem;
+    font-family: monospace;
+    text-align: center;
+}
+.angle-deg {
+    color: #4fc3f7;
+    font-size: 1.1rem;
+    font-family: monospace;
+}
+
+.ping-btn {
+    padding: 10px 24px;
+    background: #0d47a1;
+    font-size: 1rem;
+    border-radius: 8px;
+    width: 100%;
+    letter-spacing: 1px;
+}
+.ping-btn:hover { background: #1565c0; }
+
+/* === Fire Hint === */
+.fire-hint {
+    background: #1a1f2e;
+    border: 1px solid #2a3040;
+    border-radius: 12px;
+    padding: 20px 24px;
+    text-align: center;
+    min-width: 220px;
+    color: #78909c;
+}
+.fire-hint strong { color: #ef5350; }
 
 /* === Results === */
 .result-panel {
     background: #1a1f2e;
+    border: 1px solid #2a3040;
     padding: 12px 16px;
     border-radius: 8px;
     text-align: center;
@@ -203,8 +360,17 @@ button:disabled { background: #37474f; cursor: not-allowed; }
 .result-miss { color: #78909c; }
 .result-sonar { color: #4fc3f7; }
 
-/* === Ship Status === */
-.ships-status { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+/* === Ship Status Bar === */
+.ship-status-bar {
+    display: flex;
+    gap: 24px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+.status-group { text-align: center; }
+.status-group h4 { color: #78909c; font-size: 0.8rem; margin-bottom: 6px; }
+.ships-status { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
 .ship-status {
     padding: 3px 8px;
     background: #1a2332;
@@ -216,18 +382,16 @@ button:disabled { background: #37474f; cursor: not-allowed; }
 /* === Sonar Log === */
 .sonar-log {
     background: #0d1117;
+    border: 1px solid #1e2733;
     border-radius: 8px;
     padding: 12px;
     max-height: 200px;
     overflow-y: auto;
-    width: 100%;
+    min-width: 200px;
+    max-width: 300px;
 }
 .sonar-log h4 { color: #4fc3f7; margin-bottom: 8px; font-size: 0.85rem; }
 .sonar-log ul { list-style: none; }
-.sonar-log li { padding: 3px 0; font-size: 0.8rem; }
+.sonar-log li { padding: 3px 0; font-size: 0.8rem; font-family: monospace; }
 .sonar-contact { color: #66bb6a; }
 .sonar-empty { color: #546e7a; }
-
-/* === Game Over === */
-.gameover-box h2 { font-size: 2rem; margin-bottom: 12px; }
-.gameover-box button { margin-top: 20px; padding: 12px 32px; font-size: 1.1rem; }
