@@ -99,27 +99,61 @@ def _check_overlap(new_cells, existing_ships):
     return False
 
 
-def _boring_sonar(target_row, target_col, enemy_player):
+def _angular_sonar(angle_degrees, enemy_player, grid_size):
     """
-    Week 2 boring-mode sonar: straight-line (Euclidean) distance
-    from the pinged cell to the nearest enemy ship cell.
-    Returns {"distance": float, "contact": bool}
+    Bearing-based sonar: scans from the center of the enemy grid at a
+    given bearing angle. Detects the nearest un-hit enemy ship cell
+    within the beam width and returns approximate distance.
+
+    angle_degrees: 0° = North (up), 90° = East (right), clockwise.
+    Beam half-width: 12°.
     """
+    # Sonar origin: center of the grid
+    origin_r = (grid_size - 1) / 2.0
+    origin_c = (grid_size - 1) / 2.0
+
+    BEAM_HALF_WIDTH = 12  # degrees
+
     enemy_ships = Ship.objects.filter(player=enemy_player, is_sunk=False)
     min_distance = float('inf')
 
     for ship in enemy_ships:
         for cell in ship.cells:
-            if list(cell) not in ship.hit_cells:  # only consider un-hit cells
-                dist = math.sqrt((target_row - cell[0])**2 + (target_col - cell[1])**2)
+            if list(cell) in ship.hit_cells:
+                continue
+
+            cr, cc = cell[0], cell[1]
+            dr = cr - origin_r
+            dc = cc - origin_c
+
+            dist = math.sqrt(dr ** 2 + dc ** 2)
+            if dist < 0.1:
+                # Cell is essentially at origin — always detected
+                min_distance = min(min_distance, dist)
+                continue
+
+            # Bearing from origin to this cell (0°=N, 90°=E, clockwise)
+            cell_bearing = math.degrees(math.atan2(dc, -dr))
+            if cell_bearing < 0:
+                cell_bearing += 360
+
+            # Angular difference (handles wraparound)
+            diff = abs(cell_bearing - angle_degrees) % 360
+            if diff > 180:
+                diff = 360 - diff
+
+            if diff <= BEAM_HALF_WIDTH:
                 min_distance = min(min_distance, dist)
 
     if min_distance == float('inf'):
-        return {"distance": -1, "contact": False}
+        return {"distance": -1, "contact": False, "bearing": angle_degrees}
 
+    # Add slight noise to distance (±0.5 cells)
+    noisy_distance = min_distance + random.uniform(-0.5, 0.5)
     return {
-        "distance": round(min_distance, 1),
-        "contact": True
+        "distance": round(max(0.1, noisy_distance), 1),
+        "contact": True,
+        "bearing": angle_degrees
     }
 
 
@@ -307,21 +341,29 @@ def api_room_state(request, room_code):
     # Action history (this player's actions and results)
     my_actions = []
     for a in Action.objects.filter(room=room, player=me).order_by('-created_at')[:20]:
-        my_actions.append({
+        action_data = {
             'type': a.action_type,
-            'target': [a.target_row, a.target_col],
             'result': a.result,
-        })
+        }
+        if a.action_type == 'sonar':
+            action_data['bearing'] = a.target_row  # angle stored in target_row
+        else:
+            action_data['target'] = [a.target_row, a.target_col]
+        my_actions.append(action_data)
 
-    # Enemy's actions against me (so I can see where they fired/sonar'd on my grid)
+    # Enemy's actions against me (so I can see where they fired on my grid)
     enemy_actions = []
     if enemy:
         for a in Action.objects.filter(room=room, player=enemy).order_by('-created_at')[:20]:
-            enemy_actions.append({
+            action_data = {
                 'type': a.action_type,
-                'target': [a.target_row, a.target_col],
                 'result': a.result,
-            })
+            }
+            if a.action_type == 'sonar':
+                action_data['bearing'] = a.target_row
+            else:
+                action_data['target'] = [a.target_row, a.target_col]
+            enemy_actions.append(action_data)
 
     return JsonResponse({
         'status': room.status,
@@ -424,8 +466,9 @@ def api_place_ships(request, room_code):
 @require_POST
 def api_action(request, room_code):
     """
-    Process a turn action (sonar or fire).
-    Expects JSON: {"action_type": "sonar"|"fire", "target_row": int, "target_col": int}
+    Process a turn action.
+    Sonar expects: {"action_type": "sonar", "angle": int}  (0-359 degrees)
+    Fire expects:  {"action_type": "fire", "target_row": int, "target_col": int}
     """
     room = get_object_or_404(Room, code=room_code.upper())
     session_key = _get_session_key(request)
@@ -442,34 +485,35 @@ def api_action(request, room_code):
 
     data = json.loads(request.body)
     action_type = data.get('action_type')
-    target_row = data.get('target_row')
-    target_col = data.get('target_col')
 
     if action_type not in ('sonar', 'fire'):
         return JsonResponse({'error': 'Invalid action type'}, status=400)
-
-    if not (0 <= target_row < room.grid_size and 0 <= target_col < room.grid_size):
-        return JsonResponse({'error': 'Target out of bounds'}, status=400)
 
     enemy = _get_enemy_player(room, me)
     if not enemy:
         return JsonResponse({'error': 'No opponent'}, status=400)
 
-    # Process the action
     if action_type == 'sonar':
-        result = _boring_sonar(target_row, target_col, enemy)
+        angle = data.get('angle', 0)
+        if not (0 <= angle < 360):
+            return JsonResponse({'error': 'Angle must be between 0 and 359'}, status=400)
+        result = _angular_sonar(angle, enemy, room.grid_size)
+        Action.objects.create(
+            room=room, player=me, action_type='sonar',
+            target_row=int(angle), target_col=-1,
+            result=result,
+        )
     else:  # fire
+        target_row = data.get('target_row')
+        target_col = data.get('target_col')
+        if not (0 <= target_row < room.grid_size and 0 <= target_col < room.grid_size):
+            return JsonResponse({'error': 'Target out of bounds'}, status=400)
         result = _process_fire(target_row, target_col, enemy)
-
-    # Save the action
-    Action.objects.create(
-        room=room,
-        player=me,
-        action_type=action_type,
-        target_row=target_row,
-        target_col=target_col,
-        result=result,
-    )
+        Action.objects.create(
+            room=room, player=me, action_type='fire',
+            target_row=target_row, target_col=target_col,
+            result=result,
+        )
 
     # Check win condition
     if action_type == 'fire' and result.get('hit') and _check_win(enemy):
