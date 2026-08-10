@@ -183,6 +183,26 @@
     // Grid position state
     let myPosition = 'left'; // 'left' or 'right' — set from gameState
 
+    // Track seen enemy fire actions to detect new ones for explosions
+    let seenEnemyFireCount = -1; // -1 means uninitialized (first load)
+
+    // Ship image map: size -> image path
+    const SUB_IMAGES = {
+        3: '{% static "game/images/sub3.png" %}',
+        4: '{% static "game/images/sub4.png" %}',
+        5: '{% static "game/images/sub5.png" %}',
+    };
+
+    // Explosion animation frames
+    const EXPLOSION_FRAMES = [
+        '{% static "game/images/Explosion/explosion1.png" %}',
+        '{% static "game/images/Explosion/explosion2.png" %}',
+        '{% static "game/images/Explosion/explosion3.png" %}',
+        '{% static "game/images/Explosion/explosion4.png" %}',
+        '{% static "game/images/Explosion/explosion5.png" %}',
+        '{% static "game/images/Explosion/explosion6.png" %}',
+    ];
+
     // ============================================================
     // Polling
     // ============================================================
@@ -374,8 +394,10 @@
         cells.forEach(([r, c]) => {
             const cell = document.getElementById(`placement-grid-${r}-${c}`);
             cell.classList.add('ship-cell');
-            cell.textContent = (currentShipIndex + 1);
         });
+
+        // Render the ship image on the first cell
+        renderShipImageOnGrid('placement-grid', cells, ship.size, orientation);
 
         const btn = document.getElementById(`ship-btn-${currentShipIndex}`);
         btn.classList.add('placed');
@@ -389,11 +411,12 @@
     }
 
     function autoPlace() {
+        // Clear placed ships and images
         placedShips = {};
         document.querySelectorAll('#placement-grid .ship-cell').forEach(el => {
             el.classList.remove('ship-cell');
-            el.textContent = '';
         });
+        document.querySelectorAll('#placement-grid .ship-img').forEach(el => el.remove());
         document.querySelectorAll('.ship-btn').forEach(btn => btn.classList.remove('placed'));
 
         SHIP_FLEET.forEach((ship, index) => {
@@ -412,8 +435,8 @@
                     cells.forEach(([cr, cc]) => {
                         const cell = document.getElementById(`placement-grid-${cr}-${cc}`);
                         cell.classList.add('ship-cell');
-                        cell.textContent = (index + 1);
                     });
+                    renderShipImageOnGrid('placement-grid', cells, ship.size, orient);
                     document.getElementById(`ship-btn-${index}`).classList.add('placed');
                     placed = true;
                 }
@@ -529,6 +552,7 @@
         updateShipStatus('enemy-ships-status', gameState.enemy_ships, false);
         updateSonarLog();
         updateBeamOverlay();
+        checkForNewEnemyExplosions();
     }
 
     // Update grid labels based on which side is mine
@@ -552,7 +576,8 @@
         const mySide = myPosition;
         const enemySide = myPosition === 'left' ? 'right' : 'left';
 
-        // Clear all data cells
+        // Clear all data cells and remove old ship images
+        document.querySelectorAll('#combined-grid .ship-img').forEach(el => el.remove());
         for (let r = 0; r < GRID_SIZE; r++) {
             for (let c = 0; c < GRID_SIZE; c++) {
                 const leftCell = document.getElementById(`left-${r}-${c}`);
@@ -576,6 +601,9 @@
         // === MY SIDE: Player's ships ===
         if (gameState.my_ships) {
             gameState.my_ships.forEach(ship => {
+                // Determine orientation from cells
+                const orient = getShipOrientation(ship.cells);
+
                 ship.cells.forEach(([r, c]) => {
                     const cell = document.getElementById(`${mySide}-${r}-${c}`);
                     if (!cell) return;
@@ -584,7 +612,6 @@
                     const isHit = ship.hit_cells.some(h => h[0] === r && h[1] === c);
                     if (isHit) {
                         cell.classList.add('cell-hit');
-                        cell.textContent = '🔥';
                     }
                     if (ship.is_sunk) {
                         cell.classList.add('cell-sunk');
@@ -601,6 +628,9 @@
                         cell.classList.remove('sonar-selectable');
                     }
                 });
+
+                // Render ship image
+                renderShipImageOnGrid(null, ship.cells, ship.size, orient, mySide);
             });
         }
 
@@ -622,16 +652,116 @@
             });
         }
 
-        // Show sunk enemy ships on enemy side
+        // Show sunk enemy ships on enemy side (with images)
         if (gameState.enemy_ships) {
             gameState.enemy_ships.forEach(ship => {
                 if (ship.is_sunk && ship.cells) {
+                    const orient = getShipOrientation(ship.cells);
                     ship.cells.forEach(([r, c]) => {
                         const cell = document.getElementById(`${enemySide}-${r}-${c}`);
-                        if (cell) cell.classList.add('cell-sunk');
+                        if (cell) {
+                            cell.classList.add('cell-sunk');
+                            cell.classList.add('ship-cell');
+                        }
                     });
+                    renderShipImageOnGrid(null, ship.cells, ship.size, orient, enemySide);
                 }
             });
+        }
+    }
+
+    // Determine ship orientation from its cell array
+    function getShipOrientation(cells) {
+        if (!cells || cells.length < 2) return 'H';
+        return cells[0][0] === cells[1][0] ? 'H' : 'V';
+    }
+
+    // Render a ship image on the first cell
+    // gridPrefix: 'placement-grid' for placement, null for combined grid (uses side)
+    // side: 'left' or 'right' (only used when gridPrefix is null)
+    function renderShipImageOnGrid(gridPrefix, cells, size, orient, side) {
+        if (!SUB_IMAGES[size]) return;
+        if (!cells || cells.length === 0) return;
+
+        const firstCell = cells[0];
+        const [r, c] = firstCell;
+
+        let cellId;
+        if (gridPrefix) {
+            cellId = `${gridPrefix}-${r}-${c}`;
+        } else {
+            cellId = `${side}-${r}-${c}`;
+        }
+
+        const anchorCell = document.getElementById(cellId);
+        if (!anchorCell) return;
+
+        // Check if image already rendered
+        if (anchorCell.querySelector('.ship-img')) return;
+
+        const img = document.createElement('img');
+        img.src = SUB_IMAGES[size];
+        img.className = 'ship-img';
+        img.draggable = false;
+
+        // Cell dimensions (including gap)
+        const cellW = anchorCell.offsetWidth;
+        const cellH = anchorCell.offsetHeight;
+        const gap = 2; // grid gap
+
+        if (orient === 'H') {
+            // Horizontal: image spans size cells wide, 1 cell tall
+            // Subs face left by default; for H placement (left-to-right), flip
+            const totalW = cellW * size + gap * (size - 1);
+            img.style.width = totalW + 'px';
+            img.style.height = cellH + 'px';
+            img.style.top = '0';
+            img.style.left = '0';
+            img.style.transform = 'scaleX(-1)'; // flip since subs face left
+        } else {
+            // Vertical: rotate 90° clockwise, origin at top-left
+            const totalH = cellH * size + gap * (size - 1);
+            img.style.width = totalH + 'px';
+            img.style.height = cellW + 'px';
+            img.style.top = '0';
+            img.style.left = '0';
+            img.style.transformOrigin = 'top left';
+            img.style.transform = 'rotate(90deg) translateY(-100%)';
+        }
+
+        anchorCell.appendChild(img);
+    }
+
+    // ============================================================
+    // Detect new enemy fire actions and play explosions
+    // ============================================================
+    function checkForNewEnemyExplosions() {
+        if (!gameState || !gameState.enemy_actions) return;
+
+        const enemyFires = gameState.enemy_actions.filter(a => a.type === 'fire');
+        const currentCount = enemyFires.length;
+
+        if (seenEnemyFireCount === -1) {
+            // First load — just set the count, don't play explosions
+            seenEnemyFireCount = currentCount;
+            return;
+        }
+
+        if (currentCount > seenEnemyFireCount) {
+            // New fire actions detected — play explosions on my grid
+            // enemy_actions is ordered newest-first, so the new ones are at the front
+            const newCount = currentCount - seenEnemyFireCount;
+            for (let i = 0; i < newCount; i++) {
+                const action = enemyFires[i];
+                if (action.target) {
+                    const [r, c] = action.target;
+                    const cell = document.getElementById(`${myPosition}-${r}-${c}`);
+                    if (cell) {
+                        playExplosion(cell);
+                    }
+                }
+            }
+            seenEnemyFireCount = currentCount;
         }
     }
 
@@ -840,12 +970,56 @@
     }
 
     // ============================================================
+    // Explosion Animation
+    // ============================================================
+    function playExplosion(cellElement) {
+        if (!cellElement) return;
+
+        const img = document.createElement('img');
+        img.className = 'explosion-anim';
+        img.src = EXPLOSION_FRAMES[0];
+        img.draggable = false;
+
+        // Size: 3x the cell so the explosion feels impactful, centered
+        const cellW = cellElement.offsetWidth;
+        const cellH = cellElement.offsetHeight;
+        const scale = 3;
+        const w = cellW * scale;
+        const h = cellH * scale;
+        img.style.width = w + 'px';
+        img.style.height = h + 'px';
+        img.style.position = 'absolute';
+        img.style.top = ((cellH - h) / 2) + 'px';
+        img.style.left = ((cellW - w) / 2) + 'px';
+        img.style.zIndex = '100';
+        img.style.pointerEvents = 'none';
+
+        cellElement.appendChild(img);
+
+        let frame = 0;
+        const interval = setInterval(() => {
+            frame++;
+            if (frame >= EXPLOSION_FRAMES.length) {
+                clearInterval(interval);
+                img.remove();
+                return;
+            }
+            img.src = EXPLOSION_FRAMES[frame];
+        }, 120);
+    }
+
+    // ============================================================
     // Fire Action (click on enemy grid)
     // ============================================================
     async function onEnemyCellClick(row, col) {
         if (!gameState || !gameState.is_my_turn) return;
         if (gameState.status !== 'in_progress') return;
         if (selectedAction !== 'fire') return;
+
+        // Play explosion animation immediately on click
+        const enemySide = myPosition === 'left' ? 'right' : 'left';
+        const targetCell = document.getElementById(`${enemySide}-${row}-${col}`);
+        playExplosion(targetCell);
 
         const res = await fetch(`/api/action/${ROOM_CODE}/`, {
             method: 'POST',

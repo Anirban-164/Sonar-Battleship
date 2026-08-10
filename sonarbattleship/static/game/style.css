@@ -1,8 +1,18 @@
 /* === Reset & Base === */
-* { margin: 0; padding: 0; box-sizing: border-box; }
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
 body {
     font-family: 'Segoe UI', system-ui, sans-serif;
     background: #0a0e17;
+    background-image: url('images/background.png');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
     color: #e0e0e0;
     min-height: 100vh;
 }
@@ -14,8 +24,17 @@ body {
     text-align: center;
     padding: 20px;
 }
-.home-container h1 { font-size: 2.5rem; color: #4fc3f7; margin-bottom: 8px; }
-.subtitle { color: #78909c; margin-bottom: 30px; }
+
+.home-container h1 {
+    font-size: 2.5rem;
+    color: #4fc3f7;
+    margin-bottom: 8px;
+}
+
+.subtitle {
+    color: #78909c;
+    margin-bottom: 30px;
+}
 
 .home-panels {
     display: flex;
@@ -23,6 +42,7 @@ body {
     flex-wrap: wrap;
     justify-content: center;
 }
+
 .panel {
     background: #1a1f2e;
     border: 1px solid #2a3040;
@@ -31,7 +51,13 @@ body {
     flex: 1;
     min-width: 240px;
 }
-.panel h2 { font-size: 1.1rem; color: #4fc3f7; margin-bottom: 16px; }
+
+.panel h2 {
+    font-size: 1.1rem;
+    color: #4fc3f7;
+    margin-bottom: 16px;
+}
+
 .panel input {
     display: block;
     width: 100%;
@@ -43,7 +69,9 @@ body {
     color: #e0e0e0;
     font-size: 1rem;
 }
-.panel button, button {
+
+.panel button,
+button {
     padding: 10px 20px;
     background: #1976d2;
     color: white;
@@ -53,14 +81,35 @@ body {
     font-size: 0.95rem;
     transition: background 0.2s;
 }
-button:hover { background: #1565c0; }
-button:disabled { background: #37474f; cursor: not-allowed; }
 
-.error-banner { background: #b71c1c; padding: 10px; border-radius: 6px; margin-bottom: 16px; }
-.error-text { color: #ef5350; margin-top: 12px; }
+button:hover {
+    background: #1565c0;
+}
+
+button:disabled {
+    background: #37474f;
+    cursor: not-allowed;
+}
+
+.error-banner {
+    background: #b71c1c;
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 16px;
+}
+
+.error-text {
+    color: #ef5350;
+    margin-top: 12px;
+}
 
 /* === Room === */
-.room-container { max-width: 1400px; margin: 20px auto; padding: 0 16px; }
+.room-container {
+    max-width: 1400px;
+    margin: 20px auto;
+    padding: 0 16px;
+}
+
 .room-header {
     display: flex;
     justify-content: space-between;
@@ -69,8 +118,17 @@ button:disabled { background: #37474f; cursor: not-allowed; }
     padding-bottom: 10px;
     border-bottom: 1px solid #2a3040;
 }
-.room-header h1 { font-size: 1.4rem; color: #4fc3f7; }
-.room-info { display: flex; gap: 12px; align-items: center; }
+
+.room-header h1 {
+    font-size: 1.4rem;
+    color: #4fc3f7;
+}
+
+.room-info {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
 
 .badge {
     padding: 4px 12px;
@@ -79,23 +137,46 @@ button:disabled { background: #37474f; cursor: not-allowed; }
     font-weight: 600;
     text-transform: uppercase;
 }
-.badge-waiting { background: #f57f17; color: #000; }
-.badge-placement { background: #7b1fa2; }
-.badge-in_progress { background: #2e7d32; }
-.badge-finished { background: #b71c1c; }
 
-.turn-mine { color: #66bb6a; font-weight: bold; }
-.turn-opponent { color: #ef5350; }
+.badge-waiting {
+    background: #f57f17;
+    color: #000;
+}
+
+.badge-placement {
+    background: #7b1fa2;
+}
+
+.badge-in_progress {
+    background: #2e7d32;
+}
+
+.badge-finished {
+    background: #b71c1c;
+}
+
+.turn-mine {
+    color: #66bb6a;
+    font-weight: bold;
+}
+
+.turn-opponent {
+    color: #ef5350;
+}
 
 /* === Waiting & Game Over === */
-.waiting-box, .gameover-box {
+.waiting-box,
+.gameover-box {
     text-align: center;
     padding: 40px;
-    background: #1a1f2e;
+    background: rgba(26, 31, 46, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border-radius: 12px;
     margin: 40px auto;
     max-width: 500px;
 }
+
 .code-display {
     font-size: 2.5rem;
     font-family: monospace;
@@ -107,23 +188,41 @@ button:disabled { background: #37474f; cursor: not-allowed; }
     cursor: pointer;
     letter-spacing: 8px;
 }
-.code-display small { display: block; font-size: 0.7rem; color: #78909c; letter-spacing: 0; }
-.gameover-box h2 { font-size: 2rem; margin-bottom: 12px; }
-.gameover-box button { margin-top: 20px; padding: 12px 32px; font-size: 1.1rem; }
+
+.code-display small {
+    display: block;
+    font-size: 0.7rem;
+    color: #78909c;
+    letter-spacing: 0;
+}
+
+.gameover-box h2 {
+    font-size: 2rem;
+    margin-bottom: 12px;
+}
+
+.gameover-box button {
+    margin-top: 20px;
+    padding: 12px 32px;
+    font-size: 1.1rem;
+}
 
 /* === Placement Grid (single grid) === */
 .grid {
     display: inline-grid;
     gap: 2px;
-    background: #1a1f2e;
+    background: rgba(26, 31, 46, 0.75);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     padding: 4px;
     border-radius: 8px;
 }
+
 .grid-cell {
     width: 28px;
     height: 28px;
-    background: #0d1117;
-    border: 1px solid #1e2733;
+    background: rgba(13, 17, 23, 0.6);
+    border: 1px solid rgba(30, 39, 51, 0.7);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -131,8 +230,15 @@ button:disabled { background: #37474f; cursor: not-allowed; }
     cursor: pointer;
     transition: background 0.15s;
     border-radius: 2px;
+    position: relative;
+    overflow: visible;
+    z-index: 1;
 }
-.grid-cell:hover { background: #1a2332; }
+
+.grid-cell:hover {
+    background: rgba(26, 35, 50, 0.7);
+}
+
 .grid-header {
     background: transparent !important;
     border: none !important;
@@ -141,12 +247,70 @@ button:disabled { background: #37474f; cursor: not-allowed; }
     cursor: default;
     font-size: 0.7rem;
 }
-.ship-cell { background: #1565c0 !important; }
-.hover-valid { background: #2e7d32 !important; opacity: 0.7; }
-.hover-invalid { background: #b71c1c !important; opacity: 0.7; }
-.cell-hit { background: #c62828 !important; }
-.cell-miss { background: #263238 !important; color: #546e7a; }
-.cell-sunk { background: #4a0000 !important; opacity: 0.6; }
+
+/* Ship cell — just marks it; actual image is rendered via JS */
+.ship-cell {
+    background: rgba(21, 101, 192, 0.15) !important;
+    border-color: rgba(21, 101, 192, 0.3) !important;
+}
+
+.hover-valid {
+    background: rgba(46, 125, 50, 0.5) !important;
+}
+
+.hover-invalid {
+    background: rgba(183, 28, 28, 0.5) !important;
+}
+
+/* Hit overlay — blurs and tints the ship portion red */
+.cell-hit {
+    background: rgba(198, 40, 40, 0.15) !important;
+}
+
+.cell-hit::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(198, 40, 40, 0.45);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    z-index: 5;
+    border-radius: 2px;
+    pointer-events: none;
+}
+
+/* Miss cell */
+.cell-miss {
+    background: rgba(38, 50, 56, 0.5) !important;
+    color: #546e7a;
+}
+
+/* Sunk overlay — desaturated, darker */
+.cell-sunk {
+    background: rgba(74, 0, 0, 0.2) !important;
+}
+
+.cell-sunk::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(40, 0, 0, 0.6);
+    backdrop-filter: blur(3px) grayscale(1);
+    -webkit-backdrop-filter: blur(3px) grayscale(1);
+    z-index: 5;
+    border-radius: 2px;
+    pointer-events: none;
+}
+
+/* Ship image container — absolutely positioned in the first cell of each ship */
+.ship-img {
+    position: absolute;
+    z-index: 3;
+    pointer-events: none;
+    image-rendering: auto;
+    filter: drop-shadow(0px 0px 8px rgba(79, 195, 247, 0.5)) brightness(1.7) contrast(1.2);
+    /* Prevent the image from being clipped by parent overflow */
+}
 
 /* === Sonar Origin Selection === */
 .sonar-selectable {
@@ -154,19 +318,30 @@ button:disabled { background: #37474f; cursor: not-allowed; }
     box-shadow: inset 0 0 0 2px rgba(79, 195, 247, 0.4);
     animation: sonar-pulse 1.8s ease-in-out infinite;
 }
+
 @keyframes sonar-pulse {
-    0%, 100% { box-shadow: inset 0 0 0 2px rgba(79, 195, 247, 0.25); }
-    50% { box-shadow: inset 0 0 0 2px rgba(79, 195, 247, 0.7); }
+
+    0%,
+    100% {
+        box-shadow: inset 0 0 0 2px rgba(79, 195, 247, 0.25);
+    }
+
+    50% {
+        box-shadow: inset 0 0 0 2px rgba(79, 195, 247, 0.7);
+    }
 }
+
 .sonar-selectable:hover {
     background: #1a3a4a !important;
     box-shadow: inset 0 0 0 2px rgba(79, 195, 247, 0.8);
 }
+
 .sonar-origin {
     background: #00838f !important;
     box-shadow: 0 0 10px rgba(0, 229, 255, 0.6), inset 0 0 0 2px #00e5ff;
     animation: none;
 }
+
 .sonar-origin::after {
     content: '📡';
     font-size: 0.65rem;
@@ -179,15 +354,29 @@ button:disabled { background: #37474f; cursor: not-allowed; }
     flex-wrap: wrap;
     margin-bottom: 16px;
 }
+
 .ship-btn {
     padding: 6px 14px;
     background: #263238;
     font-size: 0.85rem;
 }
-.ship-btn.active { background: #1976d2; }
-.ship-btn.placed { background: #2e7d32; }
-.grid-wrapper { margin-top: 12px; }
-.grid-wrapper h3 { margin-bottom: 8px; color: #78909c; }
+
+.ship-btn.active {
+    background: #1976d2;
+}
+
+.ship-btn.placed {
+    background: #2e7d32;
+}
+
+.grid-wrapper {
+    margin-top: 12px;
+}
+
+.grid-wrapper h3 {
+    margin-bottom: 8px;
+    color: #78909c;
+}
 
 /* === Game Phase — Top Bar === */
 .game-top-bar {
@@ -206,16 +395,31 @@ button:disabled { background: #37474f; cursor: not-allowed; }
     font-size: 0.9rem;
     letter-spacing: 0.5px;
 }
-.turn-bar-mine { background: rgba(46, 125, 50, 0.2); color: #66bb6a; border: 1px solid #2e7d32; }
-.turn-bar-opponent { background: rgba(183, 28, 28, 0.2); color: #ef5350; border: 1px solid #b71c1c; }
 
-.action-picker { display: flex; gap: 8px; }
+.turn-bar-mine {
+    background: rgba(46, 125, 50, 0.2);
+    color: #66bb6a;
+    border: 1px solid #2e7d32;
+}
+
+.turn-bar-opponent {
+    background: rgba(183, 28, 28, 0.2);
+    color: #ef5350;
+    border: 1px solid #b71c1c;
+}
+
+.action-picker {
+    display: flex;
+    gap: 8px;
+}
+
 .action-btn {
     padding: 10px 20px;
     background: #263238;
     font-size: 1rem;
     border-radius: 8px;
 }
+
 .action-btn.active {
     background: #1976d2;
     box-shadow: 0 0 12px rgba(25, 118, 210, 0.4);
@@ -226,13 +430,16 @@ button:disabled { background: #37474f; cursor: not-allowed; }
     text-align: center;
     margin-bottom: 16px;
     overflow-x: auto;
-    position: relative; /* Ensure it contains the overlay */
+    position: relative;
+    /* Ensure it contains the overlay */
 }
 
 .grid-overlay-container {
     position: relative;
-    display: inline-block; /* Hugs the grid exactly */
-    overflow: hidden; /* Clip the sonar beam at grid edges */
+    display: inline-block;
+    /* Hugs the grid exactly */
+    overflow: hidden;
+    /* Clip the sonar beam at grid edges */
 }
 
 #sonar-beam-overlay {
@@ -249,15 +456,23 @@ button:disabled { background: #37474f; cursor: not-allowed; }
     gap: 0;
     margin-bottom: 6px;
 }
-.grid-label-left, .grid-label-right {
+
+.grid-label-left,
+.grid-label-right {
     font-size: 0.75rem;
     font-weight: 700;
     letter-spacing: 2px;
     text-transform: uppercase;
     padding: 4px 0;
 }
-.grid-label-mine { color: #4fc3f7; }
-.grid-label-enemy { color: #ef5350; }
+
+.grid-label-mine {
+    color: #4fc3f7;
+}
+
+.grid-label-enemy {
+    color: #ef5350;
+}
 
 .grid-label-left {
     /* Offset for row header (30px) + half grid */
@@ -265,6 +480,7 @@ button:disabled { background: #37474f; cursor: not-allowed; }
     flex: 1;
     text-align: center;
 }
+
 .grid-label-right {
     margin-right: 0;
     flex: 1;
@@ -274,9 +490,11 @@ button:disabled { background: #37474f; cursor: not-allowed; }
 .combined-grid {
     display: inline-grid;
     gap: 2px;
-    background: #1a1f2e;
+    background: rgba(26, 31, 46, 0.75);
     padding: 4px;
     border-radius: 8px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 
 /* Divider column between player and enemy halves */
@@ -287,6 +505,7 @@ button:disabled { background: #37474f; cursor: not-allowed; }
     width: 4px;
     border-radius: 2px;
 }
+
 .grid-divider-header {
     background: transparent;
     border: none;
@@ -295,21 +514,23 @@ button:disabled { background: #37474f; cursor: not-allowed; }
 
 /* Player cells (left half) */
 .player-cell {
-    background: #0d1117;
-    border: 1px solid #1a2636;
+    background: rgba(13, 17, 23, 0.5);
+    border: 1px solid rgba(26, 38, 54, 0.6);
 }
+
 .player-cell:hover {
-    background: #0d1117; /* no hover effect on own grid */
+    background: rgba(13, 17, 23, 0.5);
     cursor: default;
 }
 
 /* Enemy cells (right half) */
 .enemy-cell {
-    background: #0f1318;
-    border: 1px solid #1e2733;
+    background: rgba(15, 19, 24, 0.5);
+    border: 1px solid rgba(30, 39, 51, 0.6);
 }
+
 .enemy-cell:hover {
-    background: #1a2842;
+    background: rgba(26, 40, 66, 0.5);
     cursor: crosshair;
 }
 
@@ -348,6 +569,7 @@ button:disabled { background: #37474f; cursor: not-allowed; }
     align-items: center;
     gap: 2px;
 }
+
 .angle-readout input {
     width: 60px;
     padding: 6px 8px;
@@ -359,6 +581,7 @@ button:disabled { background: #37474f; cursor: not-allowed; }
     font-family: monospace;
     text-align: center;
 }
+
 .angle-deg {
     color: #4fc3f7;
     font-size: 1.1rem;
@@ -373,7 +596,10 @@ button:disabled { background: #37474f; cursor: not-allowed; }
     width: 100%;
     letter-spacing: 1px;
 }
-.ping-btn:hover { background: #1565c0; }
+
+.ping-btn:hover {
+    background: #1565c0;
+}
 
 /* === Fire Hint === */
 .fire-hint {
@@ -385,7 +611,10 @@ button:disabled { background: #37474f; cursor: not-allowed; }
     min-width: 220px;
     color: #78909c;
 }
-.fire-hint strong { color: #ef5350; }
+
+.fire-hint strong {
+    color: #ef5350;
+}
 
 /* === Sonar Origin Hint === */
 .sonar-origin-hint {
@@ -394,7 +623,11 @@ button:disabled { background: #37474f; cursor: not-allowed; }
     font-size: 0.85rem;
     padding: 4px 0;
 }
-.sonar-origin-hint strong { color: #4fc3f7; }
+
+.sonar-origin-hint strong {
+    color: #4fc3f7;
+}
+
 .sonar-origin-display {
     color: #00e5ff;
     font-weight: 700;
@@ -412,9 +645,20 @@ button:disabled { background: #37474f; cursor: not-allowed; }
     text-align: center;
     min-width: 200px;
 }
-.result-hit { color: #ef5350; font-weight: bold; font-size: 1.1rem; }
-.result-miss { color: #78909c; }
-.result-sonar { color: #4fc3f7; }
+
+.result-hit {
+    color: #ef5350;
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+.result-miss {
+    color: #78909c;
+}
+
+.result-sonar {
+    color: #4fc3f7;
+}
 
 /* === Ship Status Bar === */
 .ship-status-bar {
@@ -424,16 +668,36 @@ button:disabled { background: #37474f; cursor: not-allowed; }
     flex-wrap: wrap;
     margin-bottom: 16px;
 }
-.status-group { text-align: center; }
-.status-group h4 { color: #78909c; font-size: 0.8rem; margin-bottom: 6px; }
-.ships-status { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+
+.status-group {
+    text-align: center;
+}
+
+.status-group h4 {
+    color: #78909c;
+    font-size: 0.8rem;
+    margin-bottom: 6px;
+}
+
+.ships-status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+}
+
 .ship-status {
     padding: 3px 8px;
     background: #1a2332;
     border-radius: 4px;
     font-size: 0.75rem;
 }
-.ship-status.sunk { background: #4a0000; text-decoration: line-through; color: #ef5350; }
+
+.ship-status.sunk {
+    background: #4a0000;
+    text-decoration: line-through;
+    color: #ef5350;
+}
 
 /* === Sonar Log === */
 .sonar-log {
@@ -446,8 +710,27 @@ button:disabled { background: #37474f; cursor: not-allowed; }
     min-width: 200px;
     max-width: 300px;
 }
-.sonar-log h4 { color: #4fc3f7; margin-bottom: 8px; font-size: 0.85rem; }
-.sonar-log ul { list-style: none; }
-.sonar-log li { padding: 3px 0; font-size: 0.8rem; font-family: monospace; }
-.sonar-contact { color: #66bb6a; }
-.sonar-empty { color: #546e7a; }
+
+.sonar-log h4 {
+    color: #4fc3f7;
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+}
+
+.sonar-log ul {
+    list-style: none;
+}
+
+.sonar-log li {
+    padding: 3px 0;
+    font-size: 0.8rem;
+    font-family: monospace;
+}
+
+.sonar-contact {
+    color: #66bb6a;
+}
+
+.sonar-empty {
+    color: #546e7a;
+}
