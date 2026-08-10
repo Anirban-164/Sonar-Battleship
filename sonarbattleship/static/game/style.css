@@ -226,6 +226,21 @@ button:disabled { background: #37474f; cursor: not-allowed; }
     text-align: center;
     margin-bottom: 16px;
     overflow-x: auto;
+    position: relative; /* Ensure it contains the overlay */
+}
+
+.grid-overlay-container {
+    position: relative;
+    display: inline-block; /* Hugs the grid exactly */
+    overflow: hidden; /* Clip the sonar beam at grid edges */
+}
+
+#sonar-beam-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    z-index: 10;
 }
 
 .grid-labels {
@@ -241,15 +256,16 @@ button:disabled { background: #37474f; cursor: not-allowed; }
     text-transform: uppercase;
     padding: 4px 0;
 }
+.grid-label-mine { color: #4fc3f7; }
+.grid-label-enemy { color: #ef5350; }
+
 .grid-label-left {
-    color: #4fc3f7;
     /* Offset for row header (30px) + half grid */
     margin-left: 30px;
     flex: 1;
     text-align: center;
 }
 .grid-label-right {
-    color: #ef5350;
     margin-right: 0;
     flex: 1;
     text-align: center;
