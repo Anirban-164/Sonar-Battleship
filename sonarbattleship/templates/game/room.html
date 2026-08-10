@@ -67,10 +67,13 @@
         <!-- Combined grid -->
         <div class="combined-grid-wrapper">
             <div class="grid-labels">
-                <span class="grid-label-left">YOUR FLEET</span>
-                <span class="grid-label-right">ENEMY WATERS</span>
+                <span id="grid-label-left" class="grid-label-left">PLAYER 1</span>
+                <span id="grid-label-right" class="grid-label-right">PLAYER 2</span>
             </div>
-            <div id="combined-grid" class="combined-grid"></div>
+            <div class="grid-overlay-container">
+                <div id="combined-grid" class="combined-grid"></div>
+                <svg id="sonar-beam-overlay" xmlns="http://www.w3.org/2000/svg"></svg>
+            </div>
         </div>
 
         <!-- Bottom panel -->
@@ -176,6 +179,9 @@
     // Sonar state
     let currentAngle = 0;
     let sonarOrigin = null; // {row, col} — selected undamaged ship cell
+
+    // Grid position state
+    let myPosition = 'left'; // 'left' or 'right' — set from gameState
 
     // ============================================================
     // Polling
@@ -452,7 +458,7 @@
         if (combinedGridBuilt) return;
         const grid = document.getElementById('combined-grid');
 
-        // Columns: row-header + GRID_SIZE player cols + divider + GRID_SIZE enemy cols
+        // Columns: row-header + GRID_SIZE left cols + divider + GRID_SIZE right cols
         grid.style.gridTemplateColumns = `30px repeat(${GRID_SIZE}, 1fr) 4px repeat(${GRID_SIZE}, 1fr)`;
 
         // Header row
@@ -466,24 +472,24 @@
             // Row label
             addGridCell(grid, String.fromCharCode(65 + r), 'grid-cell grid-header');
 
-            // Player cells (left half)
+            // Left half cells
             for (let c = 0; c < GRID_SIZE; c++) {
                 const cell = document.createElement('div');
-                cell.className = 'grid-cell player-cell';
-                cell.id = `p-${r}-${c}`;
-                cell.addEventListener('click', () => onPlayerCellClick(r, c));
+                cell.className = 'grid-cell';
+                cell.id = `left-${r}-${c}`;
+                cell.addEventListener('click', () => onGridCellClick('left', r, c));
                 grid.appendChild(cell);
             }
 
             // Divider
             addGridCell(grid, '', 'grid-divider-cell');
 
-            // Enemy cells (right half)
+            // Right half cells
             for (let c = 0; c < GRID_SIZE; c++) {
                 const cell = document.createElement('div');
-                cell.className = 'grid-cell enemy-cell';
-                cell.id = `e-${r}-${c}`;
-                cell.addEventListener('click', () => onEnemyCellClick(r, c));
+                cell.className = 'grid-cell';
+                cell.id = `right-${r}-${c}`;
+                cell.addEventListener('click', () => onGridCellClick('right', r, c));
                 grid.appendChild(cell);
             }
         }
@@ -498,38 +504,80 @@
         container.appendChild(cell);
     }
 
+    // Unified click router — decides if the clicked side is mine or enemy's
+    function onGridCellClick(side, row, col) {
+        if (side === myPosition) {
+            onPlayerCellClick(row, col);
+        } else {
+            onEnemyCellClick(row, col);
+        }
+    }
+
     // ============================================================
     // Game Phase — Update
     // ============================================================
     function updateGamePhase() {
+        // Set position from server before building/updating grid
+        myPosition = gameState.my_position || 'left';
+
         buildCombinedGrid();
         initAnglePicker();
+        updateLabels();
         updateCombinedGrid();
         updateTurnIndicator();
         updateShipStatus('my-ships-status', gameState.my_ships, true);
         updateShipStatus('enemy-ships-status', gameState.enemy_ships, false);
         updateSonarLog();
+        updateBeamOverlay();
+    }
+
+    // Update grid labels based on which side is mine
+    function updateLabels() {
+        const leftLabel = document.getElementById('grid-label-left');
+        const rightLabel = document.getElementById('grid-label-right');
+        if (myPosition === 'left') {
+            leftLabel.textContent = 'YOUR FLEET';
+            leftLabel.className = 'grid-label-left grid-label-mine';
+            rightLabel.textContent = 'ENEMY WATERS';
+            rightLabel.className = 'grid-label-right grid-label-enemy';
+        } else {
+            leftLabel.textContent = 'ENEMY WATERS';
+            leftLabel.className = 'grid-label-left grid-label-enemy';
+            rightLabel.textContent = 'YOUR FLEET';
+            rightLabel.className = 'grid-label-right grid-label-mine';
+        }
     }
 
     function updateCombinedGrid() {
+        const mySide = myPosition;
+        const enemySide = myPosition === 'left' ? 'right' : 'left';
+
         // Clear all data cells
         for (let r = 0; r < GRID_SIZE; r++) {
             for (let c = 0; c < GRID_SIZE; c++) {
-                const pCell = document.getElementById(`p-${r}-${c}`);
-                pCell.className = 'grid-cell player-cell';
-                pCell.textContent = '';
+                const leftCell = document.getElementById(`left-${r}-${c}`);
+                leftCell.className = 'grid-cell';
+                leftCell.textContent = '';
 
-                const eCell = document.getElementById(`e-${r}-${c}`);
-                eCell.className = 'grid-cell enemy-cell';
-                eCell.textContent = '';
+                const rightCell = document.getElementById(`right-${r}-${c}`);
+                rightCell.className = 'grid-cell';
+                rightCell.textContent = '';
             }
         }
 
-        // === LEFT HALF: Player's ships ===
+        // Apply base CSS classes (player-cell vs enemy-cell) based on position
+        for (let r = 0; r < GRID_SIZE; r++) {
+            for (let c = 0; c < GRID_SIZE; c++) {
+                document.getElementById(`${mySide}-${r}-${c}`).classList.add('player-cell');
+                document.getElementById(`${enemySide}-${r}-${c}`).classList.add('enemy-cell');
+            }
+        }
+
+        // === MY SIDE: Player's ships ===
         if (gameState.my_ships) {
             gameState.my_ships.forEach(ship => {
                 ship.cells.forEach(([r, c]) => {
-                    const cell = document.getElementById(`p-${r}-${c}`);
+                    const cell = document.getElementById(`${mySide}-${r}-${c}`);
                     if (!cell) return;
                     cell.classList.add('ship-cell');
 
@@ -556,12 +604,12 @@
             });
         }
 
-        // === RIGHT HALF: My fire results on enemy grid ===
+        // === ENEMY SIDE: My fire results on enemy grid ===
         if (gameState.my_actions) {
             gameState.my_actions.forEach(action => {
                 if (action.type === 'fire' && action.target) {
                     const [r, c] = action.target;
-                    const cell = document.getElementById(`e-${r}-${c}`);
+                    const cell = document.getElementById(`${enemySide}-${r}-${c}`);
                     if (!cell) return;
                     if (action.result && action.result.hit) {
                         cell.classList.add('cell-hit');
@@ -574,12 +622,12 @@
             });
         }
 
-        // Show sunk enemy ships on right half
+        // Show sunk enemy ships on enemy side
         if (gameState.enemy_ships) {
             gameState.enemy_ships.forEach(ship => {
                 if (ship.is_sunk && ship.cells) {
                     ship.cells.forEach(([r, c]) => {
-                        const cell = document.getElementById(`e-${r}-${c}`);
+                        const cell = document.getElementById(`${enemySide}-${r}-${c}`);
                         if (cell) cell.classList.add('cell-sunk');
                     });
                 }
@@ -624,8 +672,9 @@
         originDisplay.textContent = `Origin: ${cellName}`;
         originDisplay.style.display = 'block';
 
-        // Refresh grid to update visual highlights
+        // Refresh grid and beam overlay
         updateCombinedGrid();
+        updateBeamOverlay();
     }
 
     // ============================================================
@@ -663,13 +712,17 @@
             document.getElementById('btn-ping').disabled = true;
             const originDisplay = document.getElementById('sonar-origin-display');
             originDisplay.style.display = 'none';
+            clearBeamOverlay();
         } else {
             // Re-check if origin is still valid, otherwise disable ping
             document.getElementById('btn-ping').disabled = !sonarOrigin;
         }
 
         // Refresh grid to show/hide sonar-selectable styling
-        if (gameState) updateCombinedGrid();
+        if (gameState) {
+            updateCombinedGrid();
+            updateBeamOverlay();
+        }
     }
 
     // ============================================================
@@ -738,6 +791,9 @@
 
         // Update input
         document.getElementById('angle-input').value = currentAngle;
+
+        // Update beam overlay on the grid
+        updateBeamOverlay();
     }
 
     function setAngleFromInput() {
@@ -778,6 +834,7 @@
         document.getElementById('btn-ping').disabled = true;
         const originDisplay = document.getElementById('sonar-origin-display');
         originDisplay.style.display = 'none';
+        clearBeamOverlay();
 
         pollState();
     }
@@ -887,6 +944,86 @@
             msg.textContent = 'All your ships have been sunk.';
         }
         if (pollingInterval) clearInterval(pollingInterval);
+    }
+
+    // ============================================================
+    // Sonar Beam Overlay on Grid
+    // ============================================================
+    function updateBeamOverlay() {
+        const overlay = document.getElementById('sonar-beam-overlay');
+        if (!overlay) return;
+
+        if (!sonarOrigin || selectedAction !== 'sonar') {
+            clearBeamOverlay();
+            return;
+        }
+
+        const grid = document.getElementById('combined-grid');
+        const container = grid.parentElement; // grid-overlay-container
+
+        // Find the origin cell element on the grid
+        const cellId = `${myPosition}-${sonarOrigin.row}-${sonarOrigin.col}`;
+        const originCell = document.getElementById(cellId);
+        if (!originCell) { clearBeamOverlay(); return; }
+
+        // Get bounding rects
+        const gridRect = grid.getBoundingClientRect();
+        const cellRect = originCell.getBoundingClientRect();
+
+        // Origin point — center of the selected cell, relative to grid
+        const ox = cellRect.left - gridRect.left + cellRect.width / 2;
+        const oy = cellRect.top - gridRect.top + cellRect.height / 2;
+
+        // Size the SVG to match the grid
+        const w = gridRect.width;
+        const h = gridRect.height;
+        overlay.setAttribute('width', w);
+        overlay.setAttribute('height', h);
+        overlay.setAttribute('viewBox', `0 0 ${w} ${h}`);
+        overlay.style.width = w + 'px';
+        overlay.style.height = h + 'px';
+
+        // Beam parameters
+        const beamLength = Math.max(w, h) * 1.5;
+        const halfWidth = 12; // ±12° cone
+        const rad = currentAngle * Math.PI / 180;
+        const rad1 = (currentAngle - halfWidth) * Math.PI / 180;
+        const rad2 = (currentAngle + halfWidth) * Math.PI / 180;
+
+        // Bearing: 0° = up (north), 90° = right (east)
+        const ex = ox + beamLength * Math.sin(rad);
+        const ey = oy - beamLength * Math.cos(rad);
+        const wx1 = ox + beamLength * Math.sin(rad1);
+        const wy1 = oy - beamLength * Math.cos(rad1);
+        const wx2 = ox + beamLength * Math.sin(rad2);
+        const wy2 = oy - beamLength * Math.cos(rad2);
+
+        overlay.innerHTML = `
+            <defs>
+                <radialGradient id="beam-grad" cx="0" cy="0" r="1"
+                    gradientUnits="userSpaceOnUse"
+                    cx="${ox}" cy="${oy}" r="${beamLength}">
+                    <stop offset="0%" stop-color="rgba(79,195,247,0.15)"/>
+                    <stop offset="100%" stop-color="rgba(79,195,247,0)"/>
+                </radialGradient>
+            </defs>
+            <path d="M ${ox} ${oy} L ${wx1} ${wy1} L ${wx2} ${wy2} Z"
+                  fill="url(#beam-grad)" stroke="none"/>
+            <line x1="${ox}" y1="${oy}" x2="${ex}" y2="${ey}"
+                  stroke="rgba(79,195,247,0.5)" stroke-width="2"
+                  stroke-dasharray="8,5" stroke-linecap="round"/>
+            <circle cx="${ox}" cy="${oy}" r="5" fill="#00e5ff" opacity="0.8"/>
+            <circle cx="${ox}" cy="${oy}" r="8" fill="none" stroke="#00e5ff"
+                    stroke-width="1.5" opacity="0.4">
+                <animate attributeName="r" values="8;16;8" dur="2s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.4;0;0.4" dur="2s" repeatCount="indefinite"/>
+            </circle>
+        `;
+    }
+
+    function clearBeamOverlay() {
+        const overlay = document.getElementById('sonar-beam-overlay');
+        if (overlay) overlay.innerHTML = '';
     }
 
     // ============================================================

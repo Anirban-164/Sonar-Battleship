@@ -99,7 +99,7 @@ def _check_overlap(new_cells, existing_ships):
     return False
 
 
-def _angular_sonar(origin_row, origin_col, angle_degrees, enemy_player, grid_size):
+def _angular_sonar(origin_row, origin_col, angle_degrees, enemy_player, grid_size, my_position='left'):
     """
     Bearing-based sonar: scans from a player's chosen ship cell at a
     given bearing angle. Detects the nearest un-hit enemy ship cell
@@ -108,11 +108,24 @@ def _angular_sonar(origin_row, origin_col, angle_degrees, enemy_player, grid_siz
     origin_row, origin_col: the player's selected undamaged ship cell.
     angle_degrees: 0° = North (up), 90° = East (right), clockwise.
     Beam half-width: 12°.
+    my_position: 'left' or 'right' — determines the spatial offset
+                 between this player's grid and the enemy's grid.
     """
     origin_r = float(origin_row)
     origin_c = float(origin_col)
 
     BEAM_HALF_WIDTH = 12  # degrees
+
+    # --- Spatial offset for the static facing grid ---
+    # Both grids are grid_size wide. In the unified coordinate space:
+    #   Player 1 (left):  cols 0 .. (grid_size-1)
+    #   Player 2 (right): cols grid_size .. (2*grid_size - 1)
+    # So the enemy cells need to be shifted by +grid_size (if I'm left)
+    # or -grid_size (if I'm right) relative to my origin.
+    if my_position == 'left':
+        col_offset = grid_size  # enemy is to my right
+    else:
+        col_offset = -grid_size  # enemy is to my left
 
     enemy_ships = Ship.objects.filter(player=enemy_player, is_sunk=False)
     min_distance = float('inf')
@@ -123,12 +136,13 @@ def _angular_sonar(origin_row, origin_col, angle_degrees, enemy_player, grid_siz
                 continue
 
             cr, cc = cell[0], cell[1]
+            # Apply spatial offset to enemy column
+            effective_cc = cc + col_offset
             dr = cr - origin_r
-            dc = cc - origin_c
+            dc = effective_cc - origin_c
 
             dist = math.sqrt(dr ** 2 + dc ** 2)
             if dist < 0.1:
-                # Cell is essentially at origin — always detected
                 min_distance = min(min_distance, dist)
                 continue
 
@@ -374,6 +388,13 @@ def api_room_state(request, room_code):
                 action_data['target'] = [a.target_row, a.target_col]
             enemy_actions.append(action_data)
 
+    # Determine player position (first player = left, second = right)
+    all_players = list(room.players.order_by('created_at'))
+    if len(all_players) >= 2 and me.id == all_players[1].id:
+        my_position = 'right'
+    else:
+        my_position = 'left'
+
     return JsonResponse({
         'status': room.status,
         'grid_size': room.grid_size,
@@ -381,6 +402,7 @@ def api_room_state(request, room_code):
         'my_id': str(me.id),
         'is_my_turn': room.current_turn_id == me.id,
         'winner': str(room.winner_id) if room.winner_id else None,
+        'my_position': my_position,
         'players': players_data,
         'my_ships': my_ships,
         'enemy_ships': enemy_ships,
@@ -528,7 +550,14 @@ def api_action(request, room_code):
         if not origin_valid:
             return JsonResponse({'error': 'Origin must be an undamaged cell of your own ship'}, status=400)
 
-        result = _angular_sonar(origin_row, origin_col, angle, enemy, room.grid_size)
+        # Determine player position for spatial offset
+        all_players = list(room.players.order_by('created_at'))
+        if len(all_players) >= 2 and me.id == all_players[1].id:
+            my_position = 'right'
+        else:
+            my_position = 'left'
+
+        result = _angular_sonar(origin_row, origin_col, angle, enemy, room.grid_size, my_position)
         Action.objects.create(
             room=room, player=me, action_type='sonar',
             target_row=origin_row, target_col=int(angle),
