@@ -22,3 +22,6 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - **Game Views**: Refactored `api_action` in `game/views.py` to handle the new angle parameter for sonar actions while maintaining the cell target logic for fire actions.
 - **UI & Styling**: Completely rewrote the game phase UI in `templates/game/room.html` and `static/game/style.css` to accommodate the unified grid layout and the new interactive sonar angle picker.
+- **Submarine Images**: Replaced plain colored grid cells with actual submarine sprites (`sub3.png`, `sub4.png`, `sub5.png` from `resources/images/`). Ships are rendered as absolutely-positioned images spanning the full length of the ship. Horizontal ships are flipped (since sprites face left), vertical ships are rotated 90°.
+- **Ocean Background**: Set `background.png` (deep ocean scene) as the full-page background with `background-attachment: fixed`. UI panels now use semi-transparent backgrounds with `backdrop-filter: blur()` for a glass-morphism effect.
+- **Hit/Sunk Overlays**: Hit cells now display a red-tinted semi-transparent overlay with `backdrop-filter: blur(2px)` over the ship image. Sunk cells use a darker overlay with `grayscale(1)` and stronger blur, visually indicating destruction without removing the ship sprite.
