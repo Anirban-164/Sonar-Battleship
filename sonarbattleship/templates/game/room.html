@@ -107,7 +107,11 @@
                         <span class="angle-deg">°</span>
                     </div>
                 </div>
-                <button id="btn-ping" onclick="fireSonar()" class="ping-btn">📡 Ping Sonar</button>
+                <div id="sonar-origin-hint" class="sonar-origin-hint">
+                    <p>📡 Select an <strong>undamaged ship cell</strong> on your grid, then choose a bearing</p>
+                    <p id="sonar-origin-display" class="sonar-origin-display" style="display:none;"></p>
+                </div>
+                <button id="btn-ping" onclick="fireSonar()" class="ping-btn" disabled>📡 Ping Sonar</button>
             </div>
 
             <!-- Fire hint (shown when fire mode selected) -->
@@ -169,8 +173,9 @@
     let placedShips = {};
     let placementLocked = false;
 
-    // Sonar angle state
+    // Sonar state
     let currentAngle = 0;
+    let sonarOrigin = null; // {row, col} — selected undamaged ship cell
 
     // ============================================================
     // Polling
@@ -466,6 +471,7 @@
                 const cell = document.createElement('div');
                 cell.className = 'grid-cell player-cell';
                 cell.id = `p-${r}-${c}`;
+                cell.addEventListener('click', () => onPlayerCellClick(r, c));
                 grid.appendChild(cell);
             }
 
@@ -526,11 +532,26 @@
                     const cell = document.getElementById(`p-${r}-${c}`);
                     if (!cell) return;
                     cell.classList.add('ship-cell');
-                    if (ship.hit_cells.some(h => h[0] === r && h[1] === c)) {
+
+                    const isHit = ship.hit_cells.some(h => h[0] === r && h[1] === c);
+                    if (isHit) {
                         cell.classList.add('cell-hit');
                         cell.textContent = '🔥';
                     }
-                    if (ship.is_sunk) cell.classList.add('cell-sunk');
+                    if (ship.is_sunk) {
+                        cell.classList.add('cell-sunk');
+                    }
+
+                    // Sonar mode: mark undamaged ship cells as selectable
+                    if (selectedAction === 'sonar' && !isHit && !ship.is_sunk) {
+                        cell.classList.add('sonar-selectable');
+                    }
+
+                    // Mark the selected sonar origin cell
+                    if (sonarOrigin && sonarOrigin.row === r && sonarOrigin.col === c) {
+                        cell.classList.add('sonar-origin');
+                        cell.classList.remove('sonar-selectable');
+                    }
                 });
             });
         }
@@ -567,6 +588,47 @@
     }
 
     // ============================================================
+    // Sonar Origin Selection (click on own ship cell)
+    // ============================================================
+    function onPlayerCellClick(row, col) {
+        if (!gameState || selectedAction !== 'sonar') return;
+        if (!gameState.is_my_turn || gameState.status !== 'in_progress') return;
+
+        // Check this cell is an undamaged ship cell
+        let isValidOrigin = false;
+        if (gameState.my_ships) {
+            for (const ship of gameState.my_ships) {
+                if (ship.is_sunk) continue;
+                for (const [cr, cc] of ship.cells) {
+                    if (cr === row && cc === col) {
+                        const isHit = ship.hit_cells.some(h => h[0] === row && h[1] === col);
+                        if (!isHit) {
+                            isValidOrigin = true;
+                            break;
+                        }
+                    }
+                }
+                if (isValidOrigin) break;
+            }
+        }
+
+        if (!isValidOrigin) return;
+
+        // Set sonar origin
+        sonarOrigin = { row, col };
+        document.getElementById('btn-ping').disabled = false;
+
+        // Update origin display
+        const cellName = `${String.fromCharCode(65 + row)}${col}`;
+        const originDisplay = document.getElementById('sonar-origin-display');
+        originDisplay.textContent = `Origin: ${cellName}`;
+        originDisplay.style.display = 'block';
+
+        // Refresh grid to update visual highlights
+        updateCombinedGrid();
+    }
+
+    // ============================================================
     // Turn Indicator
     // ============================================================
     function updateTurnIndicator() {
@@ -594,6 +656,20 @@
         document.getElementById('btn-fire').classList.toggle('active', type === 'fire');
         document.getElementById('sonar-controls').style.display = type === 'sonar' ? 'flex' : 'none';
         document.getElementById('fire-hint').style.display = type === 'fire' ? 'block' : 'none';
+
+        // Reset sonar origin when switching modes
+        if (type !== 'sonar') {
+            sonarOrigin = null;
+            document.getElementById('btn-ping').disabled = true;
+            const originDisplay = document.getElementById('sonar-origin-display');
+            originDisplay.style.display = 'none';
+        } else {
+            // Re-check if origin is still valid, otherwise disable ping
+            document.getElementById('btn-ping').disabled = !sonarOrigin;
+        }
+
+        // Refresh grid to show/hide sonar-selectable styling
+        if (gameState) updateCombinedGrid();
     }
 
     // ============================================================
@@ -678,17 +754,31 @@
         if (!gameState || !gameState.is_my_turn) return;
         if (gameState.status !== 'in_progress') return;
 
+        if (!sonarOrigin) {
+            alert('Select an undamaged ship cell on your grid first!');
+            return;
+        }
+
         const res = await fetch(`/api/action/${ROOM_CODE}/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 action_type: 'sonar',
                 angle: currentAngle,
+                origin_row: sonarOrigin.row,
+                origin_col: sonarOrigin.col,
             }),
         });
         const data = await res.json();
         if (data.error) { alert(data.error); return; }
-        showActionResult('sonar', -1, -1, data.result);
+        showActionResult('sonar', sonarOrigin.row, sonarOrigin.col, data.result);
+
+        // Reset sonar origin after use
+        sonarOrigin = null;
+        document.getElementById('btn-ping').disabled = true;
+        const originDisplay = document.getElementById('sonar-origin-display');
+        originDisplay.style.display = 'none';
+
         pollState();
     }
 
@@ -730,10 +820,11 @@
                 panel.innerHTML = `<div class="result-miss">💨 Miss at ${cellName}</div>`;
             }
         } else {
+            const originLabel = (row >= 0 && col >= 0) ? `${String.fromCharCode(65 + row)}${col}` : '?';
             if (result.contact) {
-                panel.innerHTML = `<div class="result-sonar">📡 Contact! Bearing ${result.bearing}° — ~${result.distance} cells away</div>`;
+                panel.innerHTML = `<div class="result-sonar">📡 From ${originLabel} → ${result.bearing}° — Contact ~${result.distance} cells away</div>`;
             } else {
-                panel.innerHTML = `<div class="result-sonar">📡 No contact at bearing ${result.bearing}°</div>`;
+                panel.innerHTML = `<div class="result-sonar">📡 From ${originLabel} → ${result.bearing}° — No contact</div>`;
             }
         }
 
@@ -750,10 +841,16 @@
         const sonarActions = gameState.my_actions.filter(a => a.type === 'sonar');
         list.innerHTML = sonarActions.map(a => {
             const bearing = a.bearing !== undefined ? a.bearing : '?';
+            let originLabel = '?';
+            if (a.origin) {
+                originLabel = `${String.fromCharCode(65 + a.origin[0])}${a.origin[1]}`;
+            } else if (a.result && a.result.origin) {
+                originLabel = `${String.fromCharCode(65 + a.result.origin[0])}${a.result.origin[1]}`;
+            }
             if (a.result && a.result.contact) {
-                return `<li class="sonar-contact">📡 ${bearing}° → ~${a.result.distance} cells</li>`;
+                return `<li class="sonar-contact">📡 ${originLabel} → ${bearing}° → ~${a.result.distance} cells</li>`;
             } else {
-                return `<li class="sonar-empty">📡 ${bearing}° → No contact</li>`;
+                return `<li class="sonar-empty">📡 ${originLabel} → ${bearing}° → No contact</li>`;
             }
         }).join('');
     }

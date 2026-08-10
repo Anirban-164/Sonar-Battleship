@@ -148,6 +148,30 @@ button:disabled { background: #37474f; cursor: not-allowed; }
 .cell-miss { background: #263238 !important; color: #546e7a; }
 .cell-sunk { background: #4a0000 !important; opacity: 0.6; }
 
+/* === Sonar Origin Selection === */
+.sonar-selectable {
+    cursor: crosshair !important;
+    box-shadow: inset 0 0 0 2px rgba(79, 195, 247, 0.4);
+    animation: sonar-pulse 1.8s ease-in-out infinite;
+}
+@keyframes sonar-pulse {
+    0%, 100% { box-shadow: inset 0 0 0 2px rgba(79, 195, 247, 0.25); }
+    50% { box-shadow: inset 0 0 0 2px rgba(79, 195, 247, 0.7); }
+}
+.sonar-selectable:hover {
+    background: #1a3a4a !important;
+    box-shadow: inset 0 0 0 2px rgba(79, 195, 247, 0.8);
+}
+.sonar-origin {
+    background: #00838f !important;
+    box-shadow: 0 0 10px rgba(0, 229, 255, 0.6), inset 0 0 0 2px #00e5ff;
+    animation: none;
+}
+.sonar-origin::after {
+    content: '📡';
+    font-size: 0.65rem;
+}
+
 .placement-controls {
     display: flex;
     gap: 10px;
@@ -346,6 +370,22 @@ button:disabled { background: #37474f; cursor: not-allowed; }
     color: #78909c;
 }
 .fire-hint strong { color: #ef5350; }
+
+/* === Sonar Origin Hint === */
+.sonar-origin-hint {
+    text-align: center;
+    color: #78909c;
+    font-size: 0.85rem;
+    padding: 4px 0;
+}
+.sonar-origin-hint strong { color: #4fc3f7; }
+.sonar-origin-display {
+    color: #00e5ff;
+    font-weight: 700;
+    font-size: 1rem;
+    font-family: monospace;
+    margin-top: 4px;
+}
 
 /* === Results === */
 .result-panel {

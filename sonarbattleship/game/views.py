@@ -99,18 +99,18 @@ def _check_overlap(new_cells, existing_ships):
     return False
 
 
-def _angular_sonar(angle_degrees, enemy_player, grid_size):
+def _angular_sonar(origin_row, origin_col, angle_degrees, enemy_player, grid_size):
     """
-    Bearing-based sonar: scans from the center of the enemy grid at a
+    Bearing-based sonar: scans from a player's chosen ship cell at a
     given bearing angle. Detects the nearest un-hit enemy ship cell
     within the beam width and returns approximate distance.
 
+    origin_row, origin_col: the player's selected undamaged ship cell.
     angle_degrees: 0° = North (up), 90° = East (right), clockwise.
     Beam half-width: 12°.
     """
-    # Sonar origin: center of the grid
-    origin_r = (grid_size - 1) / 2.0
-    origin_c = (grid_size - 1) / 2.0
+    origin_r = float(origin_row)
+    origin_c = float(origin_col)
 
     BEAM_HALF_WIDTH = 12  # degrees
 
@@ -146,14 +146,18 @@ def _angular_sonar(angle_degrees, enemy_player, grid_size):
                 min_distance = min(min_distance, dist)
 
     if min_distance == float('inf'):
-        return {"distance": -1, "contact": False, "bearing": angle_degrees}
+        return {
+            "distance": -1, "contact": False, "bearing": angle_degrees,
+            "origin": [origin_row, origin_col]
+        }
 
     # Add slight noise to distance (±0.5 cells)
     noisy_distance = min_distance + random.uniform(-0.5, 0.5)
     return {
         "distance": round(max(0.1, noisy_distance), 1),
         "contact": True,
-        "bearing": angle_degrees
+        "bearing": angle_degrees,
+        "origin": [origin_row, origin_col]
     }
 
 
@@ -346,7 +350,10 @@ def api_room_state(request, room_code):
             'result': a.result,
         }
         if a.action_type == 'sonar':
-            action_data['bearing'] = a.target_row  # angle stored in target_row
+            # bearing stored in target_col, origin in result
+            action_data['bearing'] = a.target_col
+            if a.result and 'origin' in a.result:
+                action_data['origin'] = a.result['origin']
         else:
             action_data['target'] = [a.target_row, a.target_col]
         my_actions.append(action_data)
@@ -360,7 +367,9 @@ def api_room_state(request, room_code):
                 'result': a.result,
             }
             if a.action_type == 'sonar':
-                action_data['bearing'] = a.target_row
+                action_data['bearing'] = a.target_col
+                if a.result and 'origin' in a.result:
+                    action_data['origin'] = a.result['origin']
             else:
                 action_data['target'] = [a.target_row, a.target_col]
             enemy_actions.append(action_data)
@@ -495,12 +504,34 @@ def api_action(request, room_code):
 
     if action_type == 'sonar':
         angle = data.get('angle', 0)
+        origin_row = data.get('origin_row')
+        origin_col = data.get('origin_col')
+
         if not (0 <= angle < 360):
             return JsonResponse({'error': 'Angle must be between 0 and 359'}, status=400)
-        result = _angular_sonar(angle, enemy, room.grid_size)
+
+        if origin_row is None or origin_col is None:
+            return JsonResponse({'error': 'Select an undamaged ship cell as sonar origin'}, status=400)
+
+        # Validate origin cell belongs to player's own undamaged ship cell
+        my_ships = Ship.objects.filter(player=me, is_sunk=False)
+        origin_valid = False
+        for ship in my_ships:
+            for cell in ship.cells:
+                if cell[0] == origin_row and cell[1] == origin_col:
+                    if [origin_row, origin_col] not in ship.hit_cells:
+                        origin_valid = True
+                        break
+            if origin_valid:
+                break
+
+        if not origin_valid:
+            return JsonResponse({'error': 'Origin must be an undamaged cell of your own ship'}, status=400)
+
+        result = _angular_sonar(origin_row, origin_col, angle, enemy, room.grid_size)
         Action.objects.create(
             room=room, player=me, action_type='sonar',
-            target_row=int(angle), target_col=-1,
+            target_row=origin_row, target_col=int(angle),
             result=result,
         )
     else:  # fire
