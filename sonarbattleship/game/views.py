@@ -6,6 +6,7 @@ from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_GET
+from django.db import transaction
 
 from game.models import Room, Player, Ship, Action
 
@@ -495,13 +496,14 @@ def api_place_ships(request, room_code):
 
 @csrf_exempt
 @require_POST
+@transaction.atomic
 def api_action(request, room_code):
     """
     Process a turn action.
     Sonar expects: {"action_type": "sonar", "angle": int}  (0-359 degrees)
     Fire expects:  {"action_type": "fire", "target_row": int, "target_col": int}
     """
-    room = get_object_or_404(Room, code=room_code.upper())
+    room = get_object_or_404(Room.objects.select_for_update(), code=room_code.upper())
     session_key = _get_session_key(request)
     me = _get_player(room, session_key)
 
