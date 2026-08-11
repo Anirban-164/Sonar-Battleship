@@ -183,24 +183,27 @@
     // Grid position state
     let myPosition = 'left'; // 'left' or 'right' — set from gameState
 
+    // Track if an action is currently being sent to prevent double-firing
+    let actionInProgress = false;
+
     // Track seen enemy fire actions to detect new ones for explosions
     let seenEnemyFireCount = -1; // -1 means uninitialized (first load)
 
     // Ship image map: size -> image path
     const SUB_IMAGES = {
-        3: '{% static "game/images/sub3.png" %}',
-        4: '{% static "game/images/sub4.png" %}',
-        5: '{% static "game/images/sub5.png" %}',
+        3: '{% static "images/sub3.png" %}',
+        4: '{% static "images/sub4.png" %}',
+        5: '{% static "images/sub5.png" %}',
     };
 
     // Explosion animation frames
     const EXPLOSION_FRAMES = [
-        '{% static "game/images/Explosion/explosion1.png" %}',
-        '{% static "game/images/Explosion/explosion2.png" %}',
-        '{% static "game/images/Explosion/explosion3.png" %}',
-        '{% static "game/images/Explosion/explosion4.png" %}',
-        '{% static "game/images/Explosion/explosion5.png" %}',
-        '{% static "game/images/Explosion/explosion6.png" %}',
+        '{% static "images/Explosion/explosion1.png" %}',
+        '{% static "images/Explosion/explosion2.png" %}',
+        '{% static "images/Explosion/explosion3.png" %}',
+        '{% static "images/Explosion/explosion4.png" %}',
+        '{% static "images/Explosion/explosion5.png" %}',
+        '{% static "images/Explosion/explosion6.png" %}',
     ];
 
     // ============================================================
@@ -939,34 +942,42 @@
     async function fireSonar() {
         if (!gameState || !gameState.is_my_turn) return;
         if (gameState.status !== 'in_progress') return;
+        if (actionInProgress) return;
 
         if (!sonarOrigin) {
             alert('Select an undamaged ship cell on your grid first!');
             return;
         }
 
-        const res = await fetch(`/api/action/${ROOM_CODE}/`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                action_type: 'sonar',
-                angle: currentAngle,
-                origin_row: sonarOrigin.row,
-                origin_col: sonarOrigin.col,
-            }),
-        });
-        const data = await res.json();
-        if (data.error) { alert(data.error); return; }
-        showActionResult('sonar', sonarOrigin.row, sonarOrigin.col, data.result);
+        actionInProgress = true;
+        try {
+            const res = await fetch(`/api/action/${ROOM_CODE}/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action_type: 'sonar',
+                    angle: currentAngle,
+                    origin_row: sonarOrigin.row,
+                    origin_col: sonarOrigin.col,
+                }),
+            });
+            const data = await res.json();
+            if (data.error) { alert(data.error); actionInProgress = false; return; }
+            showActionResult('sonar', sonarOrigin.row, sonarOrigin.col, data.result);
 
-        // Reset sonar origin after use
-        sonarOrigin = null;
-        document.getElementById('btn-ping').disabled = true;
-        const originDisplay = document.getElementById('sonar-origin-display');
-        originDisplay.style.display = 'none';
-        clearBeamOverlay();
+            // Reset sonar origin after use
+            sonarOrigin = null;
+            document.getElementById('btn-ping').disabled = true;
+            const originDisplay = document.getElementById('sonar-origin-display');
+            originDisplay.style.display = 'none';
+            clearBeamOverlay();
 
-        pollState();
+            pollState();
+        } catch (e) {
+            console.error(e);
+        } finally {
+            actionInProgress = false;
+        }
     }
 
     // ============================================================
@@ -1015,25 +1026,33 @@
         if (!gameState || !gameState.is_my_turn) return;
         if (gameState.status !== 'in_progress') return;
         if (selectedAction !== 'fire') return;
+        if (actionInProgress) return;
 
+        actionInProgress = true;
         // Play explosion animation immediately on click
         const enemySide = myPosition === 'left' ? 'right' : 'left';
         const targetCell = document.getElementById(`${enemySide}-${row}-${col}`);
         playExplosion(targetCell);
 
-        const res = await fetch(`/api/action/${ROOM_CODE}/`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                action_type: 'fire',
-                target_row: row,
-                target_col: col,
-            }),
-        });
-        const data = await res.json();
-        if (data.error) { alert(data.error); return; }
-        showActionResult('fire', row, col, data.result);
-        pollState();
+        try {
+            const res = await fetch(`/api/action/${ROOM_CODE}/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action_type: 'fire',
+                    target_row: row,
+                    target_col: col,
+                }),
+            });
+            const data = await res.json();
+            if (data.error) { alert(data.error); actionInProgress = false; return; }
+            showActionResult('fire', row, col, data.result);
+            pollState();
+        } catch (e) {
+            console.error(e);
+        } finally {
+            actionInProgress = false;
+        }
     }
 
     // ============================================================
