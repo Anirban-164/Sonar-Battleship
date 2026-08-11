@@ -1,4 +1,3 @@
-{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 
@@ -8,200 +7,20 @@
   <title>Sonar Battleship — Turn-Based Sonar Naval Combat</title>
   <meta name="description" content="A turn-based multiplayer reimagining of Battleship where cross-correlation and matched filtering — not coordinate guessing — reveal the enemy fleet.">
 
+  <!-- Favicons -->
+  <link href="assets/img/favicon.png" rel="icon">
+  <link href="assets/img/apple-touch-icon.png" rel="apple-touch-icon">
+
   <!-- Fonts -->
   <link href="https://fonts.googleapis.com" rel="preconnect">
   <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
   <!-- Icons -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
 
   <!-- Theme CSS -->
-  <link href="{% static 'game/sonar-landing.css' %}" rel="stylesheet">
-
-  <style>
-    /* ---- Room create/join overlay modal ---- */
-    .room-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      z-index: 200;
-      background: rgba(5, 9, 13, 0.82);
-      backdrop-filter: blur(18px);
-      -webkit-backdrop-filter: blur(18px);
-      align-items: center;
-      justify-content: center;
-      animation: fade-in 0.35s ease;
-    }
-    .room-overlay.is-open { display: flex; }
-
-    @keyframes fade-in {
-      from { opacity: 0; }
-      to   { opacity: 1; }
-    }
-
-    .room-modal {
-      background: linear-gradient(160deg, var(--bg-2) 0%, var(--bg-1) 100%);
-      border: 1px solid var(--line-2);
-      border-radius: 20px;
-      padding: 44px 40px 38px;
-      max-width: 580px;
-      width: 92%;
-      position: relative;
-      box-shadow: 0 40px 100px -30px rgba(0, 0, 0, 0.8), 0 0 60px -20px rgba(63, 224, 137, 0.10);
-      animation: modal-rise 0.4s ease both;
-    }
-    @keyframes modal-rise {
-      from { opacity: 0; transform: translateY(24px) scale(0.97); }
-      to   { opacity: 1; transform: translateY(0) scale(1); }
-    }
-
-    .room-modal__close {
-      position: absolute;
-      top: 16px; right: 16px;
-      width: 36px; height: 36px;
-      border: 1px solid var(--line-1);
-      border-radius: 8px;
-      background: transparent;
-      color: var(--ink-2);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.1rem;
-      transition: color 0.2s, border-color 0.2s;
-    }
-    .room-modal__close:hover { color: var(--ink-0); border-color: var(--line-3); }
-
-    .room-modal h2 {
-      font-family: var(--f-display);
-      font-weight: 700;
-      font-size: 1.65rem;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      color: var(--ink-0);
-      margin-bottom: 6px;
-      text-align: center;
-    }
-    .room-modal .modal-sub {
-      text-align: center;
-      font-size: 0.88rem;
-      color: var(--ink-2);
-      margin-bottom: 28px;
-    }
-
-    .room-panels {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-    }
-    @media (max-width: 560px) {
-      .room-panels { grid-template-columns: 1fr; }
-    }
-
-    .room-panel {
-      background: var(--bg-3);
-      border: 1px solid var(--line-1);
-      border-radius: 14px;
-      padding: 24px 22px;
-      transition: border-color 0.25s;
-    }
-    .room-panel:hover { border-color: var(--line-2); }
-
-    .room-panel h3 {
-      font-family: var(--f-display);
-      font-size: 0.84rem;
-      font-weight: 700;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--green);
-      margin-bottom: 16px;
-    }
-
-    .room-panel input {
-      display: block;
-      width: 100%;
-      padding: 11px 14px;
-      margin-bottom: 10px;
-      background: var(--bg-1);
-      border: 1px solid var(--line-1);
-      border-radius: 8px;
-      color: var(--ink-0);
-      font-family: var(--f-body);
-      font-size: 0.92rem;
-      transition: border-color 0.2s;
-    }
-    .room-panel input::placeholder { color: var(--ink-3); }
-    .room-panel input:focus {
-      outline: none;
-      border-color: var(--green);
-      box-shadow: 0 0 0 2px rgba(63, 224, 137, 0.15);
-    }
-
-    .room-panel .btn-action {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      width: 100%;
-      padding: 13px 22px;
-      border-radius: 10px;
-      border: none;
-      font-family: var(--f-display);
-      font-weight: 700;
-      font-size: 0.92rem;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-
-    .btn-create {
-      background: linear-gradient(180deg, #4be89a 0%, #1f9d5c 100%);
-      color: #04140a;
-      box-shadow: 0 0 0 1px rgba(63, 224, 137, 0.3), 0 12px 28px -8px rgba(63, 224, 137, 0.45);
-    }
-    .btn-create:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 0 0 1px rgba(63, 224, 137, 0.45), 0 16px 34px -6px rgba(63, 224, 137, 0.55);
-    }
-
-    .btn-join {
-      background: linear-gradient(180deg, #6ad8ea 0%, #2a8fa0 100%);
-      color: #041416;
-      box-shadow: 0 0 0 1px rgba(98, 214, 232, 0.3), 0 12px 28px -8px rgba(98, 214, 232, 0.35);
-    }
-    .btn-join:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 0 0 1px rgba(98, 214, 232, 0.45), 0 16px 34px -6px rgba(98, 214, 232, 0.45);
-    }
-
-    /* error toast */
-    .room-error {
-      display: none;
-      text-align: center;
-      margin-top: 16px;
-      padding: 10px 16px;
-      border-radius: 8px;
-      background: rgba(255, 92, 92, 0.12);
-      border: 1px solid rgba(255, 92, 92, 0.3);
-      color: var(--red);
-      font-size: 0.85rem;
-      font-family: var(--f-body);
-      animation: fade-in 0.3s ease;
-    }
-
-    /* Django error banner */
-    .django-error-banner {
-      text-align: center;
-      padding: 12px 16px;
-      margin-bottom: 20px;
-      border-radius: 8px;
-      background: rgba(255, 92, 92, 0.12);
-      border: 1px solid rgba(255, 92, 92, 0.3);
-      color: var(--red);
-      font-size: 0.88rem;
-    }
-  </style>
+  <link href="assets/css/sonar.css" rel="stylesheet">
 </head>
 
 <body>
@@ -221,9 +40,10 @@
 
       <nav class="nav" id="nav">
         <ul class="nav__list">
-          <li><a href="#top" class="active">Home</a></li>
+          <li><a href="#top" class="active">Gameplay</a></li>
           <li><a href="#features">Features</a></li>
           <li><a href="#pipeline">Technology</a></li>
+          <li><a href="#">Media</a></li>
           <li><a href="#footer">About</a></li>
         </ul>
       </nav>
@@ -276,7 +96,7 @@
             </div>
           </div>
 
-          <a href="javascript:void(0)" class="btn-play" id="btn-play-now" onclick="openRoomModal()">
+          <a href="#" class="btn-play">
             Play now
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </a>
@@ -482,45 +302,6 @@
 
   </main>
 
-  <!-- ================= ROOM CREATE/JOIN MODAL ================= -->
-  <div class="room-overlay" id="room-overlay">
-    <div class="room-modal">
-      <button class="room-modal__close" onclick="closeRoomModal()" aria-label="Close">
-        <i class="bi bi-x-lg"></i>
-      </button>
-
-      <h2>Start a Match</h2>
-      <p class="modal-sub">Create a new room or join an existing one</p>
-
-      {% if error %}
-      <div class="django-error-banner">{{ error }}</div>
-      {% endif %}
-
-      <div class="room-panels">
-        <!-- Create Room -->
-        <div class="room-panel">
-          <h3><i class="bi bi-plus-circle" style="margin-right:6px"></i> Create Room</h3>
-          <input type="text" id="create-name" placeholder="Your name" maxlength="30">
-          <button class="btn-action btn-create" id="btn-create" onclick="createRoom()">
-            <i class="bi bi-broadcast"></i> Create Room
-          </button>
-        </div>
-
-        <!-- Join Room -->
-        <div class="room-panel">
-          <h3><i class="bi bi-box-arrow-in-right" style="margin-right:6px"></i> Join Room</h3>
-          <input type="text" id="join-name" placeholder="Your name" maxlength="30">
-          <input type="text" id="join-code" placeholder="Room code" maxlength="6" style="text-transform: uppercase; font-family: var(--f-mono); letter-spacing: 0.2em;">
-          <button class="btn-action btn-join" id="btn-join" onclick="joinRoom()">
-            <i class="bi bi-arrow-right-circle"></i> Join Room
-          </button>
-        </div>
-      </div>
-
-      <div class="room-error" id="room-error"></div>
-    </div>
-  </div>
-
   <footer class="site-footer" id="footer">
     <div class="container site-footer__inner">
       <div class="footer-brand">
@@ -540,95 +321,7 @@
     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </a>
 
-  <script src="{% static 'game/sonar-landing.js' %}"></script>
-  <script>
-    // ---- Room modal logic ----
-    function openRoomModal() {
-      document.getElementById('room-overlay').classList.add('is-open');
-    }
-
-    function closeRoomModal() {
-      document.getElementById('room-overlay').classList.remove('is-open');
-    }
-
-    // Close on clicking backdrop
-    document.getElementById('room-overlay').addEventListener('click', function(e) {
-      if (e.target === this) closeRoomModal();
-    });
-
-    // Close on Escape key
-    document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape') closeRoomModal();
-    });
-
-    // ---- API calls ----
-    async function createRoom() {
-      const name = document.getElementById('create-name').value.trim() || 'Player 1';
-      const btn = document.getElementById('btn-create');
-      btn.disabled = true;
-      btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Creating...';
-
-      try {
-        const res = await fetch('/api/create-room/', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({name}),
-        });
-        const data = await res.json();
-        if (data.room_code) {
-          window.location.href = '/room/' + data.room_code + '/';
-        } else {
-          showError(data.error || 'Failed to create room');
-        }
-      } catch (err) {
-        showError('Network error — please try again');
-      }
-
-      btn.disabled = false;
-      btn.innerHTML = '<i class="bi bi-broadcast"></i> Create Room';
-    }
-
-    async function joinRoom() {
-      const name = document.getElementById('join-name').value.trim() || 'Player 2';
-      const code = document.getElementById('join-code').value.trim().toUpperCase();
-      if (!code) { showError('Enter a room code'); return; }
-
-      const btn = document.getElementById('btn-join');
-      btn.disabled = true;
-      btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Joining...';
-
-      try {
-        const res = await fetch('/api/join-room/', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({name, code}),
-        });
-        const data = await res.json();
-        if (data.room_code) {
-          window.location.href = '/room/' + data.room_code + '/';
-        } else {
-          showError(data.error || 'Failed to join room');
-        }
-      } catch (err) {
-        showError('Network error — please try again');
-      }
-
-      btn.disabled = false;
-      btn.innerHTML = '<i class="bi bi-arrow-right-circle"></i> Join Room';
-    }
-
-    function showError(msg) {
-      const el = document.getElementById('room-error');
-      el.textContent = msg;
-      el.style.display = 'block';
-      setTimeout(() => el.style.display = 'none', 4000);
-    }
-
-    // Auto-open modal if Django passed an error
-    {% if error %}
-    openRoomModal();
-    {% endif %}
-  </script>
+  <script src="assets/js/sonar.js"></script>
 </body>
 
 </html>
