@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] — 2026-08-11
+
+### Changed
+- **Landing Page Redesign**: Completely replaced the old image-based landing page (`main_menu.png` overlay with invisible click zones) with the full "Visible" sonar-themed template design. The home page is now a standalone HTML page with its own design system instead of extending `base.html`.
+- **New Design System**: Adopted the Visible template's premium dark sonar aesthetic with custom CSS variables for colors (`--green`, `--cyan`, `--bg-0` through `--bg-4`), typography (Rajdhani display font, Inter body font, JetBrains Mono monospace), and spacing.
+- **Hero Section**: Added an animated hero with a rotating radar sweep, pulsing sonar ping rings, device mockups (tablet showing a radar scope with blips/reticle, phone showing signal processing waveforms), and three feature cards (Realistic Sonar, Sonar or Fire, Multi-cell Fleets).
+- **Signal Chain Pipeline**: Added a "How a ping becomes a hit" section with six illustrated pipeline cards (Sonar Ping → Received Signal → Cross-Correlation → Matched Filter → Detection → Signal Strength), each with inline SVG art and animated elements.
+- **Room Create/Join Modal**: Replaced the inline form-based room creation flow with a glassmorphic overlay modal. Clicking "Play Now" in the hero opens the modal with Create Room and Join Room panels side by side. Includes loading states on buttons, error toasts, backdrop click/Escape key dismissal, and auto-open when Django passes an error context.
+- **Quote Section & Footer**: Added a styled quote strip and a minimal footer with the sonar brand mark and project attribution.
+
+### Added
+- `static/game/sonar-landing.css` — Full sonar theme stylesheet (CSS variables, header, hero, pipeline, footer, responsive breakpoints, scroll-reveal animations).
+- `static/game/sonar-landing.js` — Page interaction script (mobile nav toggle, scroll-top button, sticky header shadow, IntersectionObserver scroll reveals).
+- Bootstrap Icons loaded via CDN (`bootstrap-icons@1.11.3`) for UI icons throughout the landing page.
+- Google Fonts loaded via CDN (Rajdhani, Inter, JetBrains Mono) for the new typography system.
+- Scroll-to-top button with smooth scroll behavior.
+- Responsive design with breakpoints at 1239px, 991px, 767px, and 480px.
+- `prefers-reduced-motion` media query support to disable animations for accessibility.
+
+### Removed
+- Dependency on `main_menu.png` image for the landing page layout.
+- Invisible percentage-based click zones for the "Play Now" button.
+- Landing page's dependency on `base.html` template inheritance (now standalone).
+
+---
+
 ## [Unreleased]
 
 ### Added

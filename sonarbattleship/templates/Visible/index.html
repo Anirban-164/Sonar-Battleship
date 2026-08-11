@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>Sonar Battleship — Turn-Based Sonar Naval Combat</title>
+  <meta name="description" content="A turn-based multiplayer reimagining of Battleship where cross-correlation and matched filtering — not coordinate guessing — reveal the enemy fleet.">
+
+  <!-- Favicons -->
+  <link href="assets/img/favicon.png" rel="icon">
+  <link href="assets/img/apple-touch-icon.png" rel="apple-touch-icon">
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- Icons -->
+  <link href="assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- Theme CSS -->
+  <link href="assets/css/sonar.css" rel="stylesheet">
+</head>
+
+<body>
+
+  <header class="site-header">
+    <div class="container site-header__inner">
+      <a href="#top" class="brand">
+        <svg class="brand__mark" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="17" cy="17" r="15.3" stroke="currentColor" stroke-width="1.3" opacity="0.45"/>
+          <circle cx="17" cy="17" r="10.4" stroke="currentColor" stroke-width="1.3" opacity="0.7"/>
+          <circle cx="17" cy="17" r="5.4" stroke="currentColor" stroke-width="1.3"/>
+          <circle cx="17" cy="17" r="2" fill="currentColor"/>
+          <path d="M17 17 L27.5 8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <span class="brand__word">SONAR <span>BATTLESHIP</span></span>
+      </a>
+
+      <nav class="nav" id="nav">
+        <ul class="nav__list">
+          <li><a href="#top" class="active">Gameplay</a></li>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#pipeline">Technology</a></li>
+          <li><a href="#">Media</a></li>
+          <li><a href="#footer">About</a></li>
+        </ul>
+      </nav>
+
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation" aria-expanded="false" aria-controls="nav">
+        <i class="bi bi-list"></i>
+      </button>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ================= HERO ================= -->
+    <section class="hero abyss" id="top">
+      <div class="depth-lines"></div>
+
+      <svg class="hero__sub" viewBox="0 0 700 220" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <ellipse cx="380" cy="120" rx="255" ry="34" fill="currentColor"/>
+        <path d="M120 120 C120 104 140 96 168 96 L168 144 C140 144 120 136 120 120Z" fill="currentColor"/>
+        <rect x="300" y="46" width="66" height="58" rx="10" fill="currentColor"/>
+        <rect x="317" y="14" width="6" height="34" rx="2" fill="currentColor"/>
+        <rect x="339" y="20" width="6" height="28" rx="2" fill="currentColor"/>
+        <path d="M600 108 L648 84 L648 96 L624 108 L648 120 L648 132 Z" fill="currentColor"/>
+      </svg>
+
+      <div class="ping-field" aria-hidden="true"><span></span><span></span><span></span></div>
+
+      <div class="container hero__inner">
+        <div class="hero__content">
+          <h1 class="hero__title">SONAR<span>BATTLESHIP</span></h1>
+          <div class="hero__rule"></div>
+          <p class="hero__tag1">Turn-based strategic naval warfare</p>
+          <p class="hero__tag2">Powered by real sonar signal processing</p>
+
+          <div class="hero__features" id="features">
+            <div class="hfeat">
+              <div class="hfeat__icon"><i class="bi bi-broadcast"></i></div>
+              <h3>Realistic sonar</h3>
+              <p>Cross-correlation and matched filtering pull a real echo out of a noisy signal — not a coordinate lookup.</p>
+            </div>
+            <div class="hfeat">
+              <div class="hfeat__icon"><i class="bi bi-crosshair2"></i></div>
+              <h3>Sonar or fire</h3>
+              <p>Every turn is one or the other: ping for a distance reading, or fire blind and risk missing outright.</p>
+            </div>
+            <div class="hfeat">
+              <div class="hfeat__icon"><i class="bi bi-grid-3x3"></i></div>
+              <h3>Multi-cell fleets</h3>
+              <p>Ships span three to five linked cells, so one contact only narrows down where the rest is hiding.</p>
+            </div>
+          </div>
+
+          <a href="#" class="btn-play">
+            Play now
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+        </div>
+
+        <div class="hero__visual">
+          <div class="devices">
+
+            <div class="device device--tablet">
+              <div class="device__screen">
+                <div class="screen__topbar">
+                  <div class="topbar__turn">
+                    <span class="mono">TURN 12</span>
+                    <span class="topbar__label">Your move</span>
+                  </div>
+                  <div class="topbar__menu">&#8942;</div>
+                </div>
+
+                <div class="screen__body">
+                  <div class="scope-wrap">
+                    <div class="scope-rows">
+                      <span>A</span><span>B</span><span>C</span><span>D</span><span>E</span>
+                      <span>F</span><span>G</span><span>H</span><span>I</span><span>J</span>
+                    </div>
+                    <div class="radar">
+                      <div class="radar__rings"><div class="radar__ring-outer"></div></div>
+                      <div class="radar__crosshair"></div>
+                      <div class="radar__sweep"></div>
+                      <div class="blip" style="--x:30%;--y:36%"></div>
+                      <div class="blip blip--dim" style="--x:66%;--y:64%"></div>
+                      <div class="blip" style="--x:52%;--y:50%"></div>
+                      <div class="reticle" style="--x:52%;--y:50%">
+                        <span class="corner"></span><span class="corner"></span><span class="corner"></span><span class="corner"></span>
+                      </div>
+                    </div>
+                    <div class="scope-cols">
+                      <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+                      <span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
+                    </div>
+                  </div>
+
+                  <aside class="contact-panel">
+                    <h4>Contact analysis</h4>
+                    <dl>
+                      <div><dt>Class</dt><dd class="accent mono">Submarine</dd></div>
+                      <div><dt>Est. range</dt><dd class="mono">1,250 m</dd></div>
+                      <div><dt>Bearing</dt><dd class="mono">127&deg;</dd></div>
+                      <div><dt>Uncertainty</dt><dd class="mono">&plusmn; 2.9 m</dd></div>
+                    </dl>
+                    <div class="signal-meter">
+                      <span>Signal strength</span>
+                      <div class="meter"><div class="meter__fill" style="width:78%"></div></div>
+                    </div>
+                  </aside>
+                </div>
+              </div>
+            </div>
+
+            <div class="device device--phone">
+              <div class="device__screen">
+                <div class="phone__label">Contact processing</div>
+
+                <div class="phone__block">
+                  <div class="phone__caption"><span>Received signal</span></div>
+                  <svg class="wave-svg" viewBox="0 0 150 44" preserveAspectRatio="none" aria-hidden="true">
+                    <polyline points="0.0,22.7 3.5,20.5 7.0,22.4 10.5,18.2 14.0,20.1 17.4,21.4 20.9,24.9 24.4,25.7 27.9,17.8 31.4,19.5 34.9,24.1 38.4,15.6 41.9,20.5 45.3,21.7 48.8,26.0 52.3,24.2 55.8,21.0 59.3,20.8 62.8,21.2 66.3,26.9 69.8,20.6 73.3,21.0 76.7,23.1 80.2,21.6 83.7,21.8 87.2,15.4 90.7,27.3 94.2,18.2 97.7,26.0 101.2,24.1 104.7,21.9 108.1,24.1 111.6,20.9 115.1,25.4 118.6,22.0 122.1,23.9 125.6,17.9 129.1,23.1 132.6,16.6 136.0,15.5 139.5,21.0 143.0,19.1 146.5,22.5 150.0,29.2"
+                      fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" style="color:var(--green)"/>
+                  </svg>
+                </div>
+
+                <div class="phone__block">
+                  <div class="phone__caption"><span>Cross-correlation</span><em>peak 0.91</em></div>
+                  <svg class="wave-svg" viewBox="0 0 260 90" preserveAspectRatio="none" aria-hidden="true">
+                    <polyline points="0.0,82.0 18.8,81.9 37.7,82.2 56.5,81.3 75.4,83.5 94.2,77.9 113.0,56.5 128.1,10.9 143.2,43.7 162.0,76.9 180.9,83.1 199.7,81.4 218.6,82.2 237.4,81.9 260.0,82.0"
+                      fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" style="color:var(--cyan)"/>
+                  </svg>
+                </div>
+
+                <div class="phone__block">
+                  <div class="phone__caption"><span>Matched filter output</span></div>
+                  <svg class="wave-svg" viewBox="0 0 300 70" preserveAspectRatio="none" aria-hidden="true">
+                    <polyline points="0.0,35.0 20.2,35.0 40.4,35.0 60.7,35.2 80.9,33.3 101.1,42.6 121.3,16.4 141.6,61.9 161.8,11.6 182.0,46.7 202.2,32.1 222.5,35.0 242.7,35.2 262.9,34.9 283.1,35.0 300.0,35.0"
+                      fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" style="color:var(--green)"/>
+                  </svg>
+                </div>
+
+                <div class="phone__estimate">
+                  <span>Estimated range</span>
+                  <strong>1,250 m</strong>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= SIGNAL CHAIN / PIPELINE ================= -->
+    <section class="pipeline" id="pipeline">
+      <div class="container">
+        <div class="section-head" data-reveal>
+          <span class="section-eyebrow">The signal chain</span>
+          <h2>How a ping becomes a hit</h2>
+          <p>Every Sonar action runs the same six-stage pipeline before it reaches a player — the cross-correlation and convolution math from the course, wired into a live match.</p>
+        </div>
+
+        <div class="pipeline-row" data-reveal>
+
+          <div class="pcard">
+            <span class="pcard__label"><b>01</b>Sonar ping</span>
+            <div class="pcard__art ping-art">
+              <svg class="ship-icon" viewBox="0 0 48 28" fill="currentColor" aria-hidden="true">
+                <path d="M2 17c0-2 3-3 8-3h22c7 0 14 2 14 5s-7 4-15 4H11c-5.5 0-9-2.5-9-6z" opacity="0.92"/>
+                <rect x="19" y="7" width="11" height="9" rx="2.5"/>
+                <rect x="22" y="1" width="1.8" height="7" rx="0.9"/>
+                <rect x="26" y="3" width="1.8" height="5" rx="0.9"/>
+              </svg>
+              <div class="rings"><span></span><span></span><span></span></div>
+            </div>
+            <p class="pcard__note">A Gaussian-windowed pulse fires toward the target cell.</p>
+          </div>
+
+          <div class="pcard">
+            <span class="pcard__label"><b>02</b>Received signal</span>
+            <div class="pcard__art">
+              <svg class="wave-svg" viewBox="0 0 300 70" preserveAspectRatio="none" aria-hidden="true">
+                <polyline points="0.0,35.0 5.1,36.6 10.2,33.5 15.3,30.1 20.3,32.5 25.4,29.5 30.5,35.3 35.6,42.4 40.7,32.3 45.8,31.6 50.8,37.7 55.9,37.0 61.0,35.6 66.1,29.9 71.2,34.8 76.3,38.8 81.4,27.6 86.4,32.5 91.5,24.5 96.6,27.9 101.7,24.9 106.8,33.7 111.9,28.0 116.9,36.5 122.0,35.9 127.1,34.0 132.2,21.2 137.3,32.0 142.4,34.7 147.5,35.6 152.5,26.6 157.6,32.4 162.7,29.6 167.8,30.6 172.9,40.8 178.0,30.6 183.1,34.8 188.1,39.8 193.2,32.2 198.3,33.7 203.4,31.2 208.5,41.2 213.6,26.9 218.6,35.5 223.7,42.5 228.8,26.5 233.9,39.7 239.0,35.7 244.1,31.5 249.2,46.0 254.2,39.2 259.3,28.4 264.4,35.4 269.5,38.2 274.6,34.0 279.7,38.8 284.7,34.6 289.8,38.7 294.9,42.9 300.0,31.3"
+                  fill="none" stroke="var(--green)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <p class="pcard__note">The echo comes back buried in additive Gaussian noise.</p>
+          </div>
+
+          <div class="pcard">
+            <span class="pcard__label"><b>03</b>Cross-correlation</span>
+            <div class="pcard__art corr-art">
+              <span class="peak-tag">peak 0.87</span>
+              <svg class="wave-svg" viewBox="0 0 260 90" preserveAspectRatio="none" aria-hidden="true">
+                <polyline points="0.0,82.0 3.8,82.0 7.5,82.0 11.3,82.0 15.1,82.0 18.8,81.9 22.6,81.9 26.4,82.0 30.1,82.1 33.9,82.2 37.7,82.2 41.4,82.2 45.2,82.1 49.0,81.8 52.8,81.5 56.5,81.3 60.3,81.4 64.1,81.8 67.8,82.5 71.6,83.2 75.4,83.5 79.1,83.1 82.9,82.1 86.7,80.7 90.4,79.1 94.2,77.9 98.0,76.9 101.7,75.4 105.5,72.2 109.3,66.2 113.0,56.5 116.8,43.7 120.6,29.8 124.3,17.9 128.1,10.9 131.9,10.9 135.7,17.9 139.4,29.8 143.2,43.7 147.0,56.5 150.7,66.2 154.5,72.2 158.3,75.4 162.0,76.9 165.8,77.9 169.6,79.1 173.3,80.7 177.1,82.1 180.9,83.1 184.6,83.5 188.4,83.2 192.2,82.5 195.9,81.8 199.7,81.4 203.5,81.3 207.2,81.5 211.0,81.8 214.8,82.1 218.6,82.2 222.3,82.2 226.1,82.2 229.9,82.1 233.6,82.0 237.4,81.9 241.2,81.9 244.9,82.0 248.7,82.0 252.5,82.0 256.2,82.0 260.0,82.0"
+                  fill="none" stroke="var(--cyan)" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+              </svg>
+              <div class="corr-axis"><span>-100</span><span>0</span><span>100</span></div>
+            </div>
+            <p class="pcard__note">The pulse template slides across the signal, lag by lag.</p>
+          </div>
+
+          <div class="pcard">
+            <span class="pcard__label"><b>04</b>Matched filter</span>
+            <div class="pcard__art">
+              <svg class="wave-svg" viewBox="0 0 300 70" preserveAspectRatio="none" aria-hidden="true">
+                <polyline points="0.0,35.0 6.7,35.0 13.5,35.0 20.2,35.0 27.0,35.0 33.7,35.1 40.4,35.0 47.2,34.8 53.9,34.7 60.7,35.2 67.4,36.2 74.2,36.1 80.9,33.3 87.6,30.4 94.4,33.6 101.1,42.6 107.9,45.6 114.6,32.7 121.3,16.4 128.1,21.3 134.8,47.4 141.6,61.9 148.3,43.1 155.1,13.7 161.8,11.6 168.5,36.7 175.3,54.8 182.0,46.7 188.8,29.1 195.5,24.2 202.2,32.1 209.0,39.1 215.7,38.6 222.5,35.0 229.2,33.6 236.0,34.3 242.7,35.2 249.4,35.3 256.2,35.1 262.9,34.9 269.7,35.0 276.4,35.0 283.1,35.0 289.9,35.0 296.6,35.0 300.0,35.0"
+                  fill="none" stroke="var(--green)" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <p class="pcard__note">A clean, high-confidence peak falls out of the noise.</p>
+          </div>
+
+          <div class="pcard">
+            <span class="pcard__label"><b>05</b>Detection</span>
+            <div class="pcard__art detect-art">
+              <svg class="ship-icon" viewBox="0 0 48 28" fill="currentColor" aria-hidden="true">
+                <path d="M2 17c0-2 3-3 8-3h22c7 0 14 2 14 5s-7 4-15 4H11c-5.5 0-9-2.5-9-6z" opacity="0.92"/>
+                <rect x="19" y="7" width="11" height="9" rx="2.5"/>
+                <rect x="22" y="1" width="1.8" height="7" rx="0.9"/>
+                <rect x="26" y="3" width="1.8" height="5" rx="0.9"/>
+              </svg>
+              <span class="detect-tag">Confirmed contact</span>
+            </div>
+            <p class="pcard__note">Peak height crosses the threshold — contact, not clutter.</p>
+          </div>
+
+          <div class="pcard">
+            <span class="pcard__label"><b>06</b>Signal strength</span>
+            <div class="pcard__art meter-art">
+              <div class="bars">
+                <span style="height:28%"></span>
+                <span style="height:46%"></span>
+                <span style="height:64%"></span>
+                <span style="height:84%"></span>
+                <span style="height:100%"></span>
+              </div>
+              <div class="readout">
+                <span class="db mono">&minus;42 dB</span>
+                <span class="qual">Good</span>
+              </div>
+            </div>
+            <p class="pcard__note">Reported back to the player as range, not raw decibels.</p>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= QUOTE ================= -->
+    <section class="quote-strip">
+      <div class="container">
+        <blockquote>
+          <span class="qmark">&ldquo;</span>In the silent depths, knowledge is your greatest weapon.<span class="qmark">&rdquo;</span>
+        </blockquote>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer" id="footer">
+    <div class="container site-footer__inner">
+      <div class="footer-brand">
+        <svg viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="17" cy="17" r="15.3" stroke="currentColor" stroke-width="1.3" opacity="0.45"/>
+          <circle cx="17" cy="17" r="10.4" stroke="currentColor" stroke-width="1.3" opacity="0.7"/>
+          <circle cx="17" cy="17" r="5.4" stroke="currentColor" stroke-width="1.3"/>
+          <circle cx="17" cy="17" r="2" fill="currentColor"/>
+        </svg>
+        <span>Sonar Battleship</span>
+      </div>
+      <p class="footer-note">Built for CSE 220 — Signal Processing, as a two-person team project.</p>
+    </div>
+  </footer>
+
+  <a href="#top" class="scroll-top" aria-label="Back to top">
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 19V5M5 12l7-7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </a>
+
+  <script src="assets/js/sonar.js"></script>
+</body>
+
+</html>
