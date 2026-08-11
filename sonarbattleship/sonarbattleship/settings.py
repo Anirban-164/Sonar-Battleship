@@ -140,7 +140,10 @@ SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 SESSION_COOKIE_AGE = 86400  # 24 hours
 
 # Static files
-STATICFILES_DIRS = [BASE_DIR / 'static']
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+    BASE_DIR / 'resources',
+]
 
 # Templates directory
 TEMPLATES[0]['DIRS'] = [BASE_DIR / 'templates']
