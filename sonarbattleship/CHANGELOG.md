@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0] — 2026-09-01
+
+### Added
+- **Signal Engine Module**: Introduced `game/signal_engine.py` using NumPy to simulate acoustic waveforms. Models include Gaussian-windowed sine pulses (sonar pings), broadband shockwaves (bomb hits), Additive White Gaussian Noise (ocean ambient noise), and distance-based attenuation.
+- **Oscilloscope UI**: Added a live signal oscilloscope panel to the game room. Each of the player's ships now has a dedicated hydrophone canvas trace with CRT-style scanline styling.
+- **Signal API**: New endpoint `/api/signals/<room_code>/` serves 600-sample arrays (JSON) mapping to 3 seconds of acoustic data for the frontend to render.
+- **Signal Playback Controls**: The oscilloscope automatically freezes when an event signal (echo, shockwave) is detected. Added a playback bar with Pause/Resume buttons, a scrubber slider, and a time readout, allowing players to visually analyze the waveform before returning to live ambient noise.
+- **Fire Feedback**: When a player fires a bomb, they now receive a self-shockwave acoustic signal on their own oscilloscope, providing immediate acoustic feedback.
+- **Signal Theory Documentation**: Added `Signal_Theory_Explained.tex` (LaTeX) providing a conceptual math and physics explanation of AWGN, Gaussian windows, attenuation, and time delays.
+
+### Changed
+- **Backend Modularization**: Refactored the monolithic 600-line `views.py` into a thin-controller architecture. Logic was extracted into `game/helpers.py` (session & player utilities) and `game/game_logic.py` (fleet validation, hit detection, sonar math).
+- **Code Comments**: Humanized the docstrings inside `signal_engine.py` to replace dense academic formatting and Greek symbols with easy-to-read explanations.
+
 ## [0.4.0] — 2026-08-11
 
 ### Changed
