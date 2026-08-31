@@ -30,6 +30,12 @@ from game.game_logic import (
     process_fire,
     check_win,
 )
+from game.signal_engine import (
+    generate_sonar_echo,
+    generate_incoming_sonar_signals,
+    generate_bomb_shockwave_signals,
+    generate_idle_signals,
+)
 
 
 # ============================================================
@@ -412,4 +418,104 @@ def api_action(request, room_code):
     return JsonResponse({
         'result': result,
         'game_over': False,
+    })
+
+
+# ============================================================
+# API views — Signal data for oscilloscope display
+# ============================================================
+
+@require_GET
+def api_signals(request, room_code):
+    """
+    Serves per-ship signal waveform data for the oscilloscope panel.
+    Called by the frontend every poll cycle. Returns 600-sample arrays
+    that get drawn as waveform traces on canvas elements.
+    """
+    room = get_object_or_404(Room, code=room_code.upper())
+    session_key = get_session_key(request)
+    me = get_player(room, session_key)
+
+    if not me:
+        return JsonResponse({'error': 'Not in this room'}, status=403)
+
+    if room.status != 'in_progress':
+        return JsonResponse({'signals': {}, 'event_type': 'idle'})
+
+    enemy = get_enemy_player(room, me)
+    my_position = get_player_position(room, me)
+
+    # grab my ships as dicts for the signal engine
+    my_ships = [{
+        'size': s.size,
+        'cells': s.cells,
+        'hit_cells': s.hit_cells,
+        'is_sunk': s.is_sunk,
+    } for s in Ship.objects.filter(player=me)]
+
+    if not my_ships:
+        return JsonResponse({'signals': {}, 'event_type': 'idle'})
+
+    # check if there's a new action we haven't rendered yet
+    last_seen_id = request.GET.get('last_signal_action_id', '')
+    latest_action = Action.objects.filter(room=room).order_by('-created_at').first()
+
+    event_type = 'idle'
+    signals = {}
+
+    if latest_action and str(latest_action.id) != last_seen_id:
+        if latest_action.player_id == me.id:
+            # I fired sonar -> I hear my own echo
+            if latest_action.action_type == 'sonar':
+                event_type = 'sonar_echo'
+                enemy_ships = []
+                if enemy:
+                    for s in Ship.objects.filter(player=enemy):
+                        enemy_ships.append({
+                            'cells': s.cells,
+                            'hit_cells': s.hit_cells,
+                            'is_sunk': s.is_sunk,
+                        })
+                # origin stored in result, angle stored in target_col
+                origin_result = latest_action.result or {}
+                origin = origin_result.get('origin', [latest_action.target_row, 0])
+                angle = latest_action.target_col
+
+                signals = generate_sonar_echo(
+                    origin, angle,
+                    my_ships, enemy_ships,
+                    room.grid_size, my_position
+                )
+            else:
+                # I fired a bomb — no special signal for me
+                event_type = 'idle'
+                signals = generate_idle_signals(len(my_ships))
+        else:
+            # enemy did something
+            if latest_action.action_type == 'sonar':
+                # enemy sonar ping passes near my ships
+                event_type = 'incoming_sonar'
+                origin_result = latest_action.result or {}
+                enemy_origin = origin_result.get('origin', [0, 0])
+                angle = latest_action.target_col
+
+                signals = generate_incoming_sonar_signals(
+                    enemy_origin, angle,
+                    my_ships, room.grid_size, my_position
+                )
+            elif latest_action.action_type == 'fire':
+                # enemy bomb -> shockwave
+                event_type = 'bomb_shockwave'
+                signals = generate_bomb_shockwave_signals(
+                    (latest_action.target_row, latest_action.target_col),
+                    my_ships, room.grid_size, my_position
+                )
+    else:
+        # nothing new, just ocean noise
+        signals = generate_idle_signals(len(my_ships))
+
+    return JsonResponse({
+        'signals': signals,
+        'event_type': event_type,
+        'action_id': str(latest_action.id) if latest_action else '',
     })

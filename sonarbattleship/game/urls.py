@@ -16,4 +16,7 @@ urlpatterns = [
 
     # --- Week 2 API routes ---
     path('api/action/<str:room_code>/', views.api_action, name='api_action'),
+
+    # --- Week 3 API routes ---
+    path('api/signals/<str:room_code>/', views.api_signals, name='api_signals'),
 ]
