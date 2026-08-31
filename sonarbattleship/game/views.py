@@ -487,9 +487,12 @@ def api_signals(request, room_code):
                     room.grid_size, my_position
                 )
             else:
-                # I fired a bomb — no special signal for me
-                event_type = 'idle'
-                signals = generate_idle_signals(len(my_ships))
+                # I fired a bomb — my ships hear the explosion's shockwave
+                event_type = 'bomb_shockwave'
+                signals = generate_bomb_shockwave_signals(
+                    (latest_action.target_row, latest_action.target_col),
+                    my_ships, room.grid_size, my_position
+                )
         else:
             # enemy did something
             if latest_action.action_type == 'sonar':

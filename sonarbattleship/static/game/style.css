@@ -822,4 +822,71 @@ button:disabled {
         rgba(0, 0, 0, 0.08) 4px
     );
     border-radius: 8px;
+}
+
+/* --- Signal playback controls --- */
+.signal-playback-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 6px 10px;
+    background: rgba(13, 17, 23, 0.85);
+    border: 1px solid rgba(79, 195, 247, 0.1);
+    border-radius: 8px;
+}
+
+.signal-playback-bar.hidden {
+    display: none;
+}
+
+.signal-playback-btn {
+    background: rgba(79, 195, 247, 0.15);
+    border: 1px solid rgba(79, 195, 247, 0.25);
+    color: #4fc3f7;
+    font-size: 0.8rem;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+    white-space: nowrap;
+}
+
+.signal-playback-btn:hover {
+    background: rgba(79, 195, 247, 0.3);
+}
+
+.signal-playback-btn.active {
+    background: rgba(239, 83, 80, 0.25);
+    border-color: rgba(239, 83, 80, 0.4);
+    color: #ef5350;
+}
+
+.signal-scrubber {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(79, 195, 247, 0.15);
+    outline: none;
+    cursor: pointer;
+}
+
+.signal-scrubber::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #4fc3f7;
+    cursor: pointer;
+    box-shadow: 0 0 4px rgba(79, 195, 247, 0.5);
+}
+
+.signal-time-readout {
+    font-family: monospace;
+    font-size: 0.7rem;
+    color: #78909c;
+    min-width: 40px;
+    text-align: right;
 }
