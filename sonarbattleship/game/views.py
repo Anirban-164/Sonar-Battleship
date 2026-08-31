@@ -1,7 +1,13 @@
+"""
+views.py — Django view functions (thin controllers).
+
+Page views and API endpoints. All game logic is in game_logic.py,
+all shared utilities are in helpers.py.
+"""
+
 import json
-import math
 import random
-import string
+
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
@@ -9,211 +15,21 @@ from django.views.decorators.http import require_POST, require_GET
 from django.db import transaction
 
 from game.models import Room, Player, Ship, Action
-
-
-# ============================================================
-# Ship config — classic Battleship fleet
-# ============================================================
-SHIP_FLEET = [
-    {'size': 5},
-    {'size': 4},
-    {'size': 3}
-]
-
-GRID_SIZE = 15  # 15x15 grid, matches DB default
-
-
-# ============================================================
-# Helper functions
-# ============================================================
-
-def _generate_room_code():
-    """Generate a unique 6-character room code."""
-    while True:
-        code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-        if not Room.objects.filter(code=code).exists():
-            return code
-
-
-def _get_session_key(request):
-    """Ensure the request has a session and return its key."""
-    if not request.session.session_key:
-        request.session.create()
-    return request.session.session_key
-
-
-def _get_player(room, session_key):
-    """Get the Player object for this session in this room, or None."""
-    try:
-        return Player.objects.get(room=room, session_key=session_key)
-    except Player.DoesNotExist:
-        return None
-
-
-def _validate_ship_placement(cells, size, grid_size):
-    """
-    Validate that a ship's cells are:
-    1. Correct count (matches size)
-    2. All within the grid
-    3. All adjacent in a straight line (horizontal or vertical)
-    Returns (is_valid, error_message)
-    """
-    if len(cells) != size:
-        return False, f"Expected {size} cells, got {len(cells)}"
-
-    for r, c in cells:
-        if r < 0 or r >= grid_size or c < 0 or c >= grid_size:
-            return False, f"Cell ({r},{c}) is out of bounds"
-
-    # Check all cells are in a straight line
-    rows = [c[0] for c in cells]
-    cols = [c[1] for c in cells]
-
-    if len(set(rows)) == 1:
-        # Horizontal — all same row, columns must be consecutive
-        sorted_cols = sorted(cols)
-        for i in range(1, len(sorted_cols)):
-            if sorted_cols[i] != sorted_cols[i-1] + 1:
-                return False, "Cells are not adjacent (horizontal)"
-    elif len(set(cols)) == 1:
-        # Vertical — all same column, rows must be consecutive
-        sorted_rows = sorted(rows)
-        for i in range(1, len(sorted_rows)):
-            if sorted_rows[i] != sorted_rows[i-1] + 1:
-                return False, "Cells are not adjacent (vertical)"
-    else:
-        return False, "Cells are not in a straight line"
-
-    return True, ""
-
-
-def _check_overlap(new_cells, existing_ships):
-    """Check if new ship cells overlap with any already-placed ship."""
-    existing_cells = set()
-    for ship in existing_ships:
-        for cell in ship.cells:
-            existing_cells.add(tuple(cell))
-
-    for cell in new_cells:
-        if tuple(cell) in existing_cells:
-            return True
-    return False
-
-
-def _angular_sonar(origin_row, origin_col, angle_degrees, enemy_player, grid_size, my_position='left'):
-    """
-    Bearing-based sonar: scans from a player's chosen ship cell at a
-    given bearing angle. Detects the nearest un-hit enemy ship cell
-    within the beam width and returns approximate distance.
-
-    origin_row, origin_col: the player's selected undamaged ship cell.
-    angle_degrees: 0° = North (up), 90° = East (right), clockwise.
-    Beam half-width: 12°.
-    my_position: 'left' or 'right' — determines the spatial offset
-                 between this player's grid and the enemy's grid.
-    """
-    origin_r = float(origin_row)
-    origin_c = float(origin_col)
-
-    BEAM_HALF_WIDTH = 12  # degrees
-
-    # --- Spatial offset for the static facing grid ---
-    # Both grids are grid_size wide. In the unified coordinate space:
-    #   Player 1 (left):  cols 0 .. (grid_size-1)
-    #   Player 2 (right): cols grid_size .. (2*grid_size - 1)
-    # So the enemy cells need to be shifted by +grid_size (if I'm left)
-    # or -grid_size (if I'm right) relative to my origin.
-    if my_position == 'left':
-        col_offset = grid_size  # enemy is to my right
-    else:
-        col_offset = -grid_size  # enemy is to my left
-
-    enemy_ships = Ship.objects.filter(player=enemy_player, is_sunk=False)
-    min_distance = float('inf')
-
-    for ship in enemy_ships:
-        for cell in ship.cells:
-            if list(cell) in ship.hit_cells:
-                continue
-
-            cr, cc = cell[0], cell[1]
-            # Apply spatial offset to enemy column
-            effective_cc = cc + col_offset
-            dr = cr - origin_r
-            dc = effective_cc - origin_c
-
-            dist = math.sqrt(dr ** 2 + dc ** 2)
-            if dist < 0.1:
-                min_distance = min(min_distance, dist)
-                continue
-
-            # Bearing from origin to this cell (0°=N, 90°=E, clockwise)
-            cell_bearing = math.degrees(math.atan2(dc, -dr))
-            if cell_bearing < 0:
-                cell_bearing += 360
-
-            # Angular difference (handles wraparound)
-            diff = abs(cell_bearing - angle_degrees) % 360
-            if diff > 180:
-                diff = 360 - diff
-
-            if diff <= BEAM_HALF_WIDTH:
-                min_distance = min(min_distance, dist)
-
-    if min_distance == float('inf'):
-        return {
-            "distance": -1, "contact": False, "bearing": angle_degrees,
-            "origin": [origin_row, origin_col]
-        }
-
-    # Add slight noise to distance (±0.5 cells)
-    noisy_distance = min_distance + random.uniform(-0.5, 0.5)
-    return {
-        "distance": round(max(0.1, noisy_distance), 1),
-        "contact": True,
-        "bearing": angle_degrees,
-        "origin": [origin_row, origin_col]
-    }
-
-
-def _process_fire(target_row, target_col, enemy_player):
-    """
-    Week 2 fire logic: direct cell lookup.
-    Returns {"hit": bool, "ship_name": str|None, "sunk": bool}
-    """
-    enemy_ships = Ship.objects.filter(player=enemy_player)
-
-    for ship in enemy_ships:
-        for cell in ship.cells:
-            if cell[0] == target_row and cell[1] == target_col:
-                # Check if already hit
-                if [target_row, target_col] in ship.hit_cells:
-                    return {"hit": False, "already_hit": True, "ship_name": None, "sunk": False}
-
-                # Record the hit
-                ship.hit_cells = ship.hit_cells + [[target_row, target_col]]
-                # Check if sunk (all cells hit)
-                if len(ship.hit_cells) >= ship.size:
-                    ship.is_sunk = True
-                ship.save()
-
-                return {
-                    "hit": True,
-                    "ship_name": "Submarine",
-                    "sunk": ship.is_sunk
-                }
-
-    return {"hit": False, "ship_name": None, "sunk": False}
-
-
-def _check_win(enemy_player):
-    """Check if all of enemy's ships are sunk."""
-    return not Ship.objects.filter(player=enemy_player, is_sunk=False).exists()
-
-
-def _get_enemy_player(room, current_player):
-    """Get the other player in the room."""
-    return Player.objects.filter(room=room).exclude(id=current_player.id).first()
+from game.helpers import (
+    get_session_key,
+    generate_room_code,
+    get_player,
+    get_enemy_player,
+    get_player_position,
+)
+from game.game_logic import (
+    SHIP_FLEET,
+    validate_ship_placement,
+    check_overlap,
+    angular_sonar,
+    process_fire,
+    check_win,
+)
 
 
 # ============================================================
@@ -222,15 +38,15 @@ def _get_enemy_player(room, current_player):
 
 def home(request):
     """Landing page — create or join a room."""
-    _get_session_key(request)  # ensure session exists
+    get_session_key(request)  # ensure session exists
     return render(request, 'game/home.html')
 
 
 def room(request, room_code):
     """Main game page for a specific room."""
     room_obj = get_object_or_404(Room, code=room_code.upper())
-    session_key = _get_session_key(request)
-    player = _get_player(room_obj, session_key)
+    session_key = get_session_key(request)
+    player = get_player(room_obj, session_key)
 
     if not player:
         # Player hasn't joined this room yet — redirect to home
@@ -247,19 +63,19 @@ def room(request, room_code):
 
 
 # ============================================================
-# API views
+# API views — Room management
 # ============================================================
 
 @csrf_exempt
 @require_POST
 def api_create_room(request):
     """Create a new room, add the creator as Player 1."""
-    session_key = _get_session_key(request)
+    session_key = get_session_key(request)
     data = json.loads(request.body)
     player_name = data.get('name', 'Player 1')
 
     room = Room.objects.create(
-        code=_generate_room_code(),
+        code=generate_room_code(),
         status='waiting',
     )
     Player.objects.create(
@@ -275,7 +91,7 @@ def api_create_room(request):
 @require_POST
 def api_join_room(request):
     """Join an existing room using a room code."""
-    session_key = _get_session_key(request)
+    session_key = get_session_key(request)
     data = json.loads(request.body)
     room_code = data.get('code', '').upper().strip()
     player_name = data.get('name', 'Player 2')
@@ -286,7 +102,7 @@ def api_join_room(request):
         return JsonResponse({'error': 'Room not found'}, status=404)
 
     # Check if this session is already in the room
-    existing = _get_player(room, session_key)
+    existing = get_player(room, session_key)
     if existing:
         return JsonResponse({'room_code': room.code})
 
@@ -308,6 +124,10 @@ def api_join_room(request):
     return JsonResponse({'room_code': room.code})
 
 
+# ============================================================
+# API views — Game state polling
+# ============================================================
+
 @require_GET
 def api_room_state(request, room_code):
     """
@@ -315,13 +135,13 @@ def api_room_state(request, room_code):
     Returns the full game state visible to the requesting player.
     """
     room = get_object_or_404(Room, code=room_code.upper())
-    session_key = _get_session_key(request)
-    me = _get_player(room, session_key)
+    session_key = get_session_key(request)
+    me = get_player(room, session_key)
 
     if not me:
         return JsonResponse({'error': 'Not in this room'}, status=403)
 
-    enemy = _get_enemy_player(room, me)
+    enemy = get_enemy_player(room, me)
 
     # Build player list
     players_data = []
@@ -389,12 +209,7 @@ def api_room_state(request, room_code):
                 action_data['target'] = [a.target_row, a.target_col]
             enemy_actions.append(action_data)
 
-    # Determine player position (first player = left, second = right)
-    all_players = list(room.players.order_by('created_at'))
-    if len(all_players) >= 2 and me.id == all_players[1].id:
-        my_position = 'right'
-    else:
-        my_position = 'left'
+    my_position = get_player_position(room, me)
 
     return JsonResponse({
         'status': room.status,
@@ -413,6 +228,10 @@ def api_room_state(request, room_code):
     })
 
 
+# ============================================================
+# API views — Ship placement
+# ============================================================
+
 @csrf_exempt
 @require_POST
 def api_place_ships(request, room_code):
@@ -421,8 +240,8 @@ def api_place_ships(request, room_code):
     Expects JSON: {"ships": [{"name": "Carrier", "cells": [[0,0],[0,1],...], "orientation": "H"}, ...]}
     """
     room = get_object_or_404(Room, code=room_code.upper())
-    session_key = _get_session_key(request)
-    me = _get_player(room, session_key)
+    session_key = get_session_key(request)
+    me = get_player(room, session_key)
 
     if not me:
         return JsonResponse({'error': 'Not in this room'}, status=403)
@@ -453,7 +272,7 @@ def api_place_ships(request, room_code):
         size = ship_data['size']
 
         # Validate placement
-        valid, error = _validate_ship_placement(cells, size, room.grid_size)
+        valid, error = validate_ship_placement(cells, size, room.grid_size)
         if not valid:
             # Rollback any created ships
             Ship.objects.filter(id__in=[s.id for s in created_ships]).delete()
@@ -462,13 +281,12 @@ def api_place_ships(request, room_code):
             }, status=400)
 
         # Check overlap with already-placed ships in this submission
-        for cell in cells:
-            if tuple(cell) in [(c[0], c[1]) for c in all_cells]:
-                Ship.objects.filter(id__in=[s.id for s in created_ships]).delete()
-                return JsonResponse({
-                    'error': f"Ship of size {size} overlaps with another ship"
-                }, status=400)
-            all_cells.append(cell)
+        if check_overlap(cells, all_cells):
+            Ship.objects.filter(id__in=[s.id for s in created_ships]).delete()
+            return JsonResponse({
+                'error': f"Ship of size {size} overlaps with another ship"
+            }, status=400)
+        all_cells.extend(cells)
 
         ship = Ship.objects.create(
             player=me,
@@ -483,7 +301,7 @@ def api_place_ships(request, room_code):
     me.save()
 
     # Check if both players have placed — if so, start the game
-    enemy = _get_enemy_player(room, me)
+    enemy = get_enemy_player(room, me)
     if enemy and enemy.ships_placed:
         # Pick a random starting player
         first_player = random.choice([me, enemy])
@@ -493,6 +311,10 @@ def api_place_ships(request, room_code):
 
     return JsonResponse({'success': True})
 
+
+# ============================================================
+# API views — Turn actions (sonar / fire)
+# ============================================================
 
 @csrf_exempt
 @require_POST
@@ -504,8 +326,8 @@ def api_action(request, room_code):
     Fire expects:  {"action_type": "fire", "target_row": int, "target_col": int}
     """
     room = get_object_or_404(Room.objects.select_for_update(), code=room_code.upper())
-    session_key = _get_session_key(request)
-    me = _get_player(room, session_key)
+    session_key = get_session_key(request)
+    me = get_player(room, session_key)
 
     if not me:
         return JsonResponse({'error': 'Not in this room'}, status=403)
@@ -522,7 +344,7 @@ def api_action(request, room_code):
     if action_type not in ('sonar', 'fire'):
         return JsonResponse({'error': 'Invalid action type'}, status=400)
 
-    enemy = _get_enemy_player(room, me)
+    enemy = get_enemy_player(room, me)
     if not enemy:
         return JsonResponse({'error': 'No opponent'}, status=400)
 
@@ -552,14 +374,9 @@ def api_action(request, room_code):
         if not origin_valid:
             return JsonResponse({'error': 'Origin must be an undamaged cell of your own ship'}, status=400)
 
-        # Determine player position for spatial offset
-        all_players = list(room.players.order_by('created_at'))
-        if len(all_players) >= 2 and me.id == all_players[1].id:
-            my_position = 'right'
-        else:
-            my_position = 'left'
+        my_position = get_player_position(room, me)
 
-        result = _angular_sonar(origin_row, origin_col, angle, enemy, room.grid_size, my_position)
+        result = angular_sonar(origin_row, origin_col, angle, enemy, room.grid_size, my_position)
         Action.objects.create(
             room=room, player=me, action_type='sonar',
             target_row=origin_row, target_col=int(angle),
@@ -570,7 +387,7 @@ def api_action(request, room_code):
         target_col = data.get('target_col')
         if not (0 <= target_row < room.grid_size and 0 <= target_col < room.grid_size):
             return JsonResponse({'error': 'Target out of bounds'}, status=400)
-        result = _process_fire(target_row, target_col, enemy)
+        result = process_fire(target_row, target_col, enemy)
         Action.objects.create(
             room=room, player=me, action_type='fire',
             target_row=target_row, target_col=target_col,
@@ -578,7 +395,7 @@ def api_action(request, room_code):
         )
 
     # Check win condition
-    if action_type == 'fire' and result.get('hit') and _check_win(enemy):
+    if action_type == 'fire' and result.get('hit') and check_win(enemy):
         room.status = 'finished'
         room.winner = me
         room.save()
