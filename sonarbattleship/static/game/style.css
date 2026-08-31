@@ -734,3 +734,159 @@ button:disabled {
 .sonar-empty {
     color: #546e7a;
 }
+
+/* ============================================
+   Signal Oscilloscope Panel (Week 3)
+   ============================================ */
+.signal-panel {
+    margin-top: 16px;
+    padding: 16px;
+    background: rgba(10, 14, 23, 0.85);
+    border: 1px solid rgba(79, 195, 247, 0.15);
+    border-radius: 12px;
+    backdrop-filter: blur(8px);
+}
+
+.signal-panel-title {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: #4fc3f7;
+    font-size: 0.9rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+}
+
+.signal-graphs {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.signal-graph-container {
+    position: relative;
+    background: rgba(0, 10, 20, 0.9);
+    border: 1px solid rgba(79, 195, 247, 0.1);
+    border-radius: 8px;
+    padding: 8px;
+    overflow: hidden;
+}
+
+/* green border glow when echo detected */
+.signal-graph-container.has-echo {
+    border-color: rgba(76, 175, 80, 0.4);
+    box-shadow: 0 0 12px rgba(76, 175, 80, 0.1);
+}
+
+.signal-graph-label {
+    font-family: monospace;
+    font-size: 0.72rem;
+    color: #78909c;
+    margin-bottom: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* event type badges */
+.signal-graph-label .event-tag {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.event-tag.idle      { background: rgba(120,144,156,0.2); color: #90a4ae; }
+.event-tag.echo      { background: rgba(76,175,80,0.2);   color: #66bb6a; }
+.event-tag.incoming  { background: rgba(255,183,77,0.2);   color: #ffb74d; }
+.event-tag.shockwave { background: rgba(239,83,80,0.2);    color: #ef5350; }
+
+.signal-canvas {
+    width: 100%;
+    height: 80px;
+    display: block;
+    border-radius: 4px;
+}
+
+/* CRT scanline overlay for that retro sonar feel */
+.signal-graph-container::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.08) 2px,
+        rgba(0, 0, 0, 0.08) 4px
+    );
+    border-radius: 8px;
+}
+
+/* --- Signal playback controls --- */
+.signal-playback-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 6px 10px;
+    background: rgba(13, 17, 23, 0.85);
+    border: 1px solid rgba(79, 195, 247, 0.1);
+    border-radius: 8px;
+}
+
+.signal-playback-bar.hidden {
+    display: none;
+}
+
+.signal-playback-btn {
+    background: rgba(79, 195, 247, 0.15);
+    border: 1px solid rgba(79, 195, 247, 0.25);
+    color: #4fc3f7;
+    font-size: 0.8rem;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+    white-space: nowrap;
+}
+
+.signal-playback-btn:hover {
+    background: rgba(79, 195, 247, 0.3);
+}
+
+.signal-playback-btn.active {
+    background: rgba(239, 83, 80, 0.25);
+    border-color: rgba(239, 83, 80, 0.4);
+    color: #ef5350;
+}
+
+.signal-scrubber {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(79, 195, 247, 0.15);
+    outline: none;
+    cursor: pointer;
+}
+
+.signal-scrubber::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #4fc3f7;
+    cursor: pointer;
+    box-shadow: 0 0 4px rgba(79, 195, 247, 0.5);
+}
+
+.signal-time-readout {
+    font-family: monospace;
+    font-size: 0.7rem;
+    color: #78909c;
+    min-width: 40px;
+    text-align: right;
+}
