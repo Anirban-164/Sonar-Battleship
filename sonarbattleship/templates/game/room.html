@@ -144,11 +144,11 @@
             </div>
         </div>
 
-        <!-- Signal Oscilloscope Panel (Week 3) -->
+        <!-- Signal Processing Panel (Week 4) -->
         <div id="signal-panel" class="signal-panel">
-            <h4 class="signal-panel-title">📡 Ship Hydrophone Signals</h4>
-            <div id="signal-graphs" class="signal-graphs">
-                <!-- one canvas per ship, built by JS -->
+            <h4 class="signal-panel-title">📡 Ship Hydrophone Signal Processing</h4>
+            <div id="signal-grid" class="signal-grid">
+                <!-- JS builds 3 columns (one per ship), each with 3 canvas rows -->
             </div>
         </div>
     </div>
@@ -1229,18 +1229,19 @@
     }
 
     // ============================================================
-    // Signal Oscilloscope (Week 3)
-    // Per-ship waveform display + pause/rewind controls
+    // Signal Processing (Week 4)
+    // 3-column grid: one per ship, each with raw/noise/detected canvases
     // ============================================================
 
     let lastSignalActionId = '';
     let signalPanelBuilt = false;
     let idleAnimFrame = null;
-    let signalPaused = false;            // is the display frozen?
-    let lastEventSignals = {};           // stored signal arrays from last event
-    let lastEventColor = '#4fc3f7';
-    let lastEventType = 'idle';
-    let signalResumeTimer = null;        // auto-resume timeout
+
+    // per-ship state
+    let shipPaused = {};
+    let shipEventSignals = {};
+    let shipEventColors = {};
+    let shipResumeTimers = {};
 
     const SIGNAL_COLORS = {
         idle:            '#4fc3f7',
@@ -1249,78 +1250,107 @@
         bomb_shockwave:  '#ef5350',
     };
 
-    // builds canvas elements + playback bar — called once
+    const LAYERS = [
+        { key: 'raw',      label: 'Raw Signal',      color: '#4fc3f7' },
+        { key: 'noise',    label: 'Filtered Noise',   color: '#78909c' },
+        { key: 'detected', label: 'Detection Output', color: '#66bb6a' },
+    ];
+
+    // builds 3 columns (one per ship), each with 3 canvas rows + controls
     function initSignalPanel() {
         if (signalPanelBuilt) return;
         if (!gameState || !gameState.my_ships || gameState.my_ships.length === 0) return;
 
-        const container = document.getElementById('signal-graphs');
-        container.innerHTML = '';
+        const grid = document.getElementById('signal-grid');
+        grid.innerHTML = '';
 
         gameState.my_ships.forEach((ship, idx) => {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'signal-graph-container';
-            wrapper.id = `signal-container-${idx}`;
+            const col = document.createElement('div');
+            col.className = 'signal-ship-col';
+            col.id = `signal-col-${idx}`;
 
-            const label = document.createElement('div');
-            label.className = 'signal-graph-label';
-            label.innerHTML = `
-                <span>SUB-${ship.size} \u2014 Hydrophone ${idx + 1}</span>
+            // header
+            const header = document.createElement('div');
+            header.className = 'signal-ship-header';
+            header.innerHTML = `
+                <span class="signal-ship-name">SUB-${ship.size} \u2014 Hydrophone ${idx + 1}</span>
                 <span class="event-tag idle" id="event-tag-${idx}">IDLE</span>
             `;
+            col.appendChild(header);
 
-            const canvas = document.createElement('canvas');
-            canvas.className = 'signal-canvas';
-            canvas.id = `signal-canvas-${idx}`;
-            canvas.width = 600;
-            canvas.height = 80;
+            // 3 canvas rows
+            LAYERS.forEach(layer => {
+                const row = document.createElement('div');
+                row.className = 'signal-row';
 
-            wrapper.appendChild(label);
-            wrapper.appendChild(canvas);
-            container.appendChild(wrapper);
+                const label = document.createElement('div');
+                label.className = 'signal-row-label';
+                label.textContent = layer.label;
+
+                const canvas = document.createElement('canvas');
+                canvas.className = 'signal-canvas-small';
+                canvas.id = `signal-canvas-${idx}-${layer.key}`;
+                canvas.width = 600;
+                canvas.height = 55;
+
+                row.appendChild(label);
+                row.appendChild(canvas);
+                col.appendChild(row);
+            });
+
+            // per-ship playback bar
+            const controls = document.createElement('div');
+            controls.className = 'signal-ship-controls hidden';
+            controls.id = `signal-controls-${idx}`;
+            controls.innerHTML = `
+                <button class="signal-playback-btn" id="signal-pause-btn-${idx}"
+                        onclick="toggleShipPause(${idx})">⏸</button>
+                <input type="range" class="signal-scrubber" id="signal-scrubber-${idx}"
+                       min="0" max="599" value="599"
+                       oninput="onShipScrub(${idx}, this.value)">
+                <span class="signal-time-readout" id="signal-time-${idx}">3.0s</span>
+                <button class="signal-playback-btn" id="signal-resume-btn-${idx}"
+                        onclick="resumeShipIdle(${idx})">▶</button>
+            `;
+            col.appendChild(controls);
+
+            // detection readout
+            const readout = document.createElement('div');
+            readout.className = 'signal-detection-readout';
+            readout.id = `signal-readout-${idx}`;
+            readout.textContent = 'Listening...';
+            col.appendChild(readout);
+
+            grid.appendChild(col);
         });
-
-        // playback control bar (shared across all ships)
-        const bar = document.createElement('div');
-        bar.className = 'signal-playback-bar hidden';
-        bar.id = 'signal-playback-bar';
-        bar.innerHTML = `
-            <button class="signal-playback-btn" id="signal-pause-btn" onclick="toggleSignalPause()">⏸ Pause</button>
-            <input type="range" class="signal-scrubber" id="signal-scrubber" min="0" max="599" value="599"
-                   oninput="onSignalScrub(this.value)">
-            <span class="signal-time-readout" id="signal-time-readout">3.0s</span>
-            <button class="signal-playback-btn" id="signal-resume-btn" onclick="resumeSignalIdle()">▶ Resume</button>
-        `;
-        container.parentElement.appendChild(bar);
 
         signalPanelBuilt = true;
         startIdleAnimation();
     }
 
-    // --- idle noise animation ---
+    // --- idle animation: noise on all 3 layers per ship ---
     function startIdleAnimation() {
         if (idleAnimFrame) cancelAnimationFrame(idleAnimFrame);
-        signalPaused = false;
-
-        // hide playback bar during idle
-        const bar = document.getElementById('signal-playback-bar');
-        if (bar) bar.classList.add('hidden');
 
         function drawIdleFrame() {
             if (!gameState || !gameState.my_ships) return;
 
             gameState.my_ships.forEach((ship, idx) => {
-                const canvas = document.getElementById(`signal-canvas-${idx}`);
-                if (!canvas) return;
+                if (shipPaused[idx]) return;
 
-                const noise = [];
-                for (let i = 0; i < canvas.width; i++) {
-                    const u1 = Math.random();
-                    const u2 = Math.random();
-                    const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-                    noise.push(z * 0.15);
-                }
-                drawSignal(canvas, noise, '#4fc3f7', false);
+                ['raw', 'noise', 'detected'].forEach(layer => {
+                    const canvas = document.getElementById(`signal-canvas-${idx}-${layer}`);
+                    if (!canvas) return;
+
+                    const noise = [];
+                    for (let i = 0; i < canvas.width; i++) {
+                        const u1 = Math.random();
+                        const u2 = Math.random();
+                        const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+                        noise.push(z * 0.15);
+                    }
+                    drawSignal(canvas, noise, '#4fc3f7', false);
+                });
             });
 
             idleAnimFrame = requestAnimationFrame(drawIdleFrame);
@@ -1329,10 +1359,7 @@
     }
 
     function stopIdleAnimation() {
-        if (idleAnimFrame) {
-            cancelAnimationFrame(idleAnimFrame);
-            idleAnimFrame = null;
-        }
+        if (idleAnimFrame) { cancelAnimationFrame(idleAnimFrame); idleAnimFrame = null; }
     }
 
     // --- oscilloscope trace renderer ---
@@ -1358,7 +1385,6 @@
 
         if (!signalData || signalData.length === 0) return;
 
-        // auto-scale
         let maxAmp = 0;
         for (let i = 0; i < signalData.length; i++) {
             maxAmp = Math.max(maxAmp, Math.abs(signalData[i]));
@@ -1370,7 +1396,6 @@
 
         if (highlight) { ctx.shadowColor = color; ctx.shadowBlur = 6; }
 
-        // waveform
         ctx.strokeStyle = color;
         ctx.lineWidth = highlight ? 1.8 : 1.2;
         ctx.lineJoin = 'round';
@@ -1383,7 +1408,7 @@
         ctx.stroke();
         ctx.shadowBlur = 0;
 
-        // scrubber cursor line (vertical yellow line showing current position)
+        // scrubber cursor
         if (cursorSample !== undefined && cursorSample >= 0) {
             const cx = cursorSample * scaleX;
             ctx.strokeStyle = 'rgba(255, 255, 0, 0.6)';
@@ -1394,7 +1419,7 @@
         }
     }
 
-    // --- animated sweep ---
+    // --- sweep animation ---
     function animateSignalDraw(canvas, signalData, color, highlight, onComplete) {
         const totalSamples = signalData.length;
         const drawSpeed = 4;
@@ -1412,67 +1437,87 @@
         requestAnimationFrame(frame);
     }
 
-    // --- playback controls ---
-    function toggleSignalPause() {
-        signalPaused = !signalPaused;
-        const btn = document.getElementById('signal-pause-btn');
-        if (signalPaused) {
-            btn.textContent = '⏸ Paused';
-            btn.classList.add('active');
-            // cancel auto-resume while paused
-            if (signalResumeTimer) { clearTimeout(signalResumeTimer); signalResumeTimer = null; }
+    // --- peak marker on detection canvas ---
+    function drawPeakMarker(canvas, peakIdx, signalData, color) {
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width;
+        const h = canvas.height;
+        const scaleX = w / signalData.length;
+        const px = peakIdx * scaleX;
+
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 2]);
+        ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, h); ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(px - 4, 0); ctx.lineTo(px + 4, 0); ctx.lineTo(px, 6);
+        ctx.closePath(); ctx.fill();
+
+        const timeSec = (peakIdx / 200).toFixed(2);
+        ctx.font = '9px monospace';
+        ctx.fillText(`${timeSec}s`, px + 6, 10);
+    }
+
+    // --- per-ship playback controls ---
+    function toggleShipPause(idx) {
+        shipPaused[idx] = !shipPaused[idx];
+        const btn = document.getElementById(`signal-pause-btn-${idx}`);
+        if (shipPaused[idx]) {
+            btn.textContent = '▶'; btn.classList.add('active');
+            if (shipResumeTimers[idx]) { clearTimeout(shipResumeTimers[idx]); shipResumeTimers[idx] = null; }
         } else {
-            btn.textContent = '⏸ Pause';
-            btn.classList.remove('active');
+            btn.textContent = '⏸'; btn.classList.remove('active');
         }
     }
 
-    function onSignalScrub(sampleIdx) {
+    function onShipScrub(idx, sampleIdx) {
         sampleIdx = parseInt(sampleIdx);
-        // pause automatically when scrubbing
-        if (!signalPaused) { signalPaused = true; }
-        const btn = document.getElementById('signal-pause-btn');
-        btn.textContent = '⏸ Paused';
-        btn.classList.add('active');
-        if (signalResumeTimer) { clearTimeout(signalResumeTimer); signalResumeTimer = null; }
+        shipPaused[idx] = true;
+        const btn = document.getElementById(`signal-pause-btn-${idx}`);
+        if (btn) { btn.textContent = '▶'; btn.classList.add('active'); }
+        if (shipResumeTimers[idx]) { clearTimeout(shipResumeTimers[idx]); shipResumeTimers[idx] = null; }
 
-        // update time readout
-        const timeReadout = document.getElementById('signal-time-readout');
-        if (timeReadout) timeReadout.textContent = (sampleIdx / 200).toFixed(2) + 's';
+        const readout = document.getElementById(`signal-time-${idx}`);
+        if (readout) readout.textContent = (sampleIdx / 200).toFixed(2) + 's';
 
-        // redraw all canvases with cursor at this position
-        if (!gameState || !gameState.my_ships) return;
-        gameState.my_ships.forEach((_, idx) => {
-            const canvas = document.getElementById(`signal-canvas-${idx}`);
-            const sigData = lastEventSignals[idx];
-            if (!canvas || !sigData) return;
-            drawSignal(canvas, sigData, lastEventColor, true, sampleIdx);
-        });
+        const layers = shipEventSignals[idx];
+        if (!layers) return;
+
+        const detColor = shipEventColors[idx] || '#66bb6a';
+        drawSignal(document.getElementById(`signal-canvas-${idx}-raw`),      layers.raw,      '#4fc3f7', false, sampleIdx);
+        drawSignal(document.getElementById(`signal-canvas-${idx}-noise`),    layers.noise,    '#78909c', false, sampleIdx);
+        drawSignal(document.getElementById(`signal-canvas-${idx}-detected`), layers.detected, detColor,  true,  sampleIdx);
     }
 
-    function resumeSignalIdle() {
-        signalPaused = false;
-        const btn = document.getElementById('signal-pause-btn');
-        if (btn) { btn.textContent = '⏸ Pause'; btn.classList.remove('active'); }
-        if (signalResumeTimer) { clearTimeout(signalResumeTimer); signalResumeTimer = null; }
+    function resumeShipIdle(idx) {
+        shipPaused[idx] = false;
+        const btn = document.getElementById(`signal-pause-btn-${idx}`);
+        if (btn) { btn.textContent = '⏸'; btn.classList.remove('active'); }
+        if (shipResumeTimers[idx]) { clearTimeout(shipResumeTimers[idx]); shipResumeTimers[idx] = null; }
 
-        // reset tags
-        if (gameState && gameState.my_ships) {
-            gameState.my_ships.forEach((_, idx) => {
-                const tag = document.getElementById(`event-tag-${idx}`);
-                const container = document.getElementById(`signal-container-${idx}`);
-                if (tag) { tag.textContent = 'IDLE'; tag.className = 'event-tag idle'; }
-                if (container) container.classList.remove('has-echo');
-            });
-        }
-        startIdleAnimation();
+        const tag = document.getElementById(`event-tag-${idx}`);
+        if (tag) { tag.textContent = 'IDLE'; tag.className = 'event-tag idle'; }
+
+        const controls = document.getElementById(`signal-controls-${idx}`);
+        if (controls) controls.classList.add('hidden');
+
+        const readout = document.getElementById(`signal-readout-${idx}`);
+        if (readout) { readout.textContent = 'Listening...'; readout.classList.remove('has-detection'); }
+
+        const allUnpaused = gameState.my_ships.every((_, i) => !shipPaused[i]);
+        if (allUnpaused) startIdleAnimation();
     }
 
     // --- main signal poller ---
     async function pollSignals() {
         if (!gameState || gameState.status !== 'in_progress') return;
         if (!signalPanelBuilt) return;
-        if (signalPaused) return; // don't fetch new signals while user is examining
+
+        const allPaused = gameState.my_ships.every((_, i) => shipPaused[i]);
+        if (allPaused) return;
 
         try {
             const url = `/api/signals/${ROOM_CODE}/?last_signal_action_id=${lastSignalActionId}`;
@@ -1487,59 +1532,65 @@
 
             if (eventType !== 'idle') {
                 stopIdleAnimation();
-                lastEventType = eventType;
-                lastEventColor = SIGNAL_COLORS[eventType] || '#4fc3f7';
-
-                // store signals for scrubbing later
-                lastEventSignals = {};
 
                 const tagLabels = { sonar_echo: 'ECHO', incoming_sonar: 'INCOMING', bomb_shockwave: 'SHOCKWAVE' };
                 const tagClasses = { sonar_echo: 'echo', incoming_sonar: 'incoming', bomb_shockwave: 'shockwave' };
 
-                let sweepsRemaining = Object.keys(signals).length;
-
                 Object.keys(signals).forEach(idxStr => {
                     const idx = parseInt(idxStr);
+                    if (shipPaused[idx]) return;
+
                     const sigData = signals[idxStr];
-                    const canvas = document.getElementById(`signal-canvas-${idx}`);
-                    const container = document.getElementById(`signal-container-${idx}`);
+                    if (!sigData) return;
+
+                    const detColor = sigData.signal_type === 'bomb' ? '#ef5350' : '#66bb6a';
+                    shipEventColors[idx] = detColor;
+
+                    shipEventSignals[idx] = {
+                        raw:      sigData.raw_signal,
+                        noise:    sigData.noise_component,
+                        detected: sigData.detected_signal,
+                    };
+
                     const tag = document.getElementById(`event-tag-${idx}`);
-                    if (!canvas || !sigData) { sweepsRemaining--; return; }
-
-                    lastEventSignals[idx] = sigData.signal;
-
-                    const hasEcho = sigData.has_echo;
-                    container.classList.toggle('has-echo', hasEcho);
-
                     if (tag) {
                         tag.textContent = tagLabels[eventType] || 'IDLE';
                         tag.className = `event-tag ${tagClasses[eventType] || 'idle'}`;
                     }
 
-                    // sweep animation, then freeze the full signal
-                    animateSignalDraw(canvas, sigData.signal, lastEventColor, hasEcho, () => {
-                        sweepsRemaining--;
-                        if (sweepsRemaining <= 0) {
-                            // all sweeps done — show playback controls
-                            const bar = document.getElementById('signal-playback-bar');
-                            if (bar) {
-                                bar.classList.remove('hidden');
-                                const scrubber = document.getElementById('signal-scrubber');
-                                if (scrubber) { scrubber.value = 599; }
-                                const readout = document.getElementById('signal-time-readout');
-                                if (readout) readout.textContent = '3.0s';
-                            }
-                            const pauseBtn = document.getElementById('signal-pause-btn');
-                            if (pauseBtn) { pauseBtn.textContent = '⏸ Pause'; pauseBtn.classList.remove('active'); }
-                            signalPaused = false;
+                    const rawCanvas = document.getElementById(`signal-canvas-${idx}-raw`);
+                    const noiseCanvas = document.getElementById(`signal-canvas-${idx}-noise`);
+                    const detCanvas = document.getElementById(`signal-canvas-${idx}-detected`);
 
-                            // auto-resume to idle after 10s (gives time to examine)
-                            if (signalResumeTimer) clearTimeout(signalResumeTimer);
-                            signalResumeTimer = setTimeout(() => {
-                                if (!signalPaused) resumeSignalIdle();
-                            }, 10000);
-                        }
-                    });
+                    if (rawCanvas)   animateSignalDraw(rawCanvas,   sigData.raw_signal,      '#4fc3f7', false);
+                    if (noiseCanvas) animateSignalDraw(noiseCanvas, sigData.noise_component,  '#78909c', false);
+                    if (detCanvas) {
+                        animateSignalDraw(detCanvas, sigData.detected_signal, detColor, sigData.detected, () => {
+                            const controls = document.getElementById(`signal-controls-${idx}`);
+                            if (controls) controls.classList.remove('hidden');
+
+                            const readout = document.getElementById(`signal-readout-${idx}`);
+                            if (readout) {
+                                if (sigData.detected) {
+                                    const typeLabel = sigData.signal_type === 'sonar' ? '🔊 Sonar' : '💥 Bomb';
+                                    readout.textContent = `${typeLabel} — D ≈ ${sigData.estimated_distance} cells (conf: ${(sigData.confidence * 100).toFixed(0)}%)`;
+                                    readout.classList.add('has-detection');
+                                } else {
+                                    readout.textContent = 'No contact detected';
+                                    readout.classList.remove('has-detection');
+                                }
+                            }
+
+                            if (sigData.detected && sigData.peak_sample_index) {
+                                drawPeakMarker(detCanvas, sigData.peak_sample_index, sigData.detected_signal, detColor);
+                            }
+
+                            if (shipResumeTimers[idx]) clearTimeout(shipResumeTimers[idx]);
+                            shipResumeTimers[idx] = setTimeout(() => {
+                                if (!shipPaused[idx]) resumeShipIdle(idx);
+                            }, 12000);
+                        });
+                    }
                 });
             }
         } catch (e) {
@@ -1551,8 +1602,7 @@
     // Init
     // ============================================================
     startPolling();
-
-    // signal polling on its own interval
     setInterval(pollSignals, 3000);
 </script>
-{% endblock %}
+{% endblock %}
+

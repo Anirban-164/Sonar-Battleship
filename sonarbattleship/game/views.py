@@ -27,6 +27,7 @@ from game.game_logic import (
     validate_ship_placement,
     check_overlap,
     angular_sonar,
+    dsp_sonar,
     process_fire,
     check_win,
 )
@@ -36,6 +37,7 @@ from game.signal_engine import (
     generate_bomb_shockwave_signals,
     generate_idle_signals,
 )
+from game.signal_processor import process_signal
 
 
 # ============================================================
@@ -382,7 +384,7 @@ def api_action(request, room_code):
 
         my_position = get_player_position(room, me)
 
-        result = angular_sonar(origin_row, origin_col, angle, enemy, room.grid_size, my_position)
+        result = dsp_sonar(origin_row, origin_col, angle, enemy, me, room.grid_size, my_position)
         Action.objects.create(
             room=room, player=me, action_type='sonar',
             target_row=origin_row, target_col=int(angle),
@@ -517,8 +519,24 @@ def api_signals(request, room_code):
         # nothing new, just ocean noise
         signals = generate_idle_signals(len(my_ships))
 
+    # run each ship's raw signal through the DSP pipeline
+    processed_signals = {}
+    for ship_idx, sig_data in signals.items():
+        processed = process_signal(sig_data['signal'])
+        processed_signals[ship_idx] = {
+            'raw_signal': processed['raw_signal'],
+            'noise_component': processed['noise_component'],
+            'detected_signal': processed['detected_signal'],
+            'detected': processed['detected'],
+            'signal_type': processed['signal_type'],
+            'confidence': processed['confidence'],
+            'estimated_distance': processed['estimated_distance'],
+            'peak_sample_index': processed['peak_sample_index'],
+            'has_echo': processed['detected'],
+        }
+
     return JsonResponse({
-        'signals': signals,
+        'signals': processed_signals,
         'event_type': event_type,
         'action_id': str(latest_action.id) if latest_action else '',
     })
