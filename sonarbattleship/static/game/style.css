@@ -736,7 +736,7 @@ button:disabled {
 }
 
 /* ============================================
-   Signal Oscilloscope Panel (Week 3)
+   Signal Processing Panel (Week 4)
    ============================================ */
 .signal-panel {
     margin-top: 16px;
@@ -756,60 +756,69 @@ button:disabled {
     margin-bottom: 12px;
 }
 
-.signal-graphs {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+/* --- 3-column grid: one column per ship --- */
+.signal-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
 }
 
-.signal-graph-container {
-    position: relative;
-    background: rgba(0, 10, 20, 0.9);
+.signal-ship-col {
+    background: rgba(0, 10, 20, 0.7);
     border: 1px solid rgba(79, 195, 247, 0.1);
     border-radius: 8px;
     padding: 8px;
-    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
-/* green border glow when echo detected */
-.signal-graph-container.has-echo {
+.signal-ship-col.has-echo {
     border-color: rgba(76, 175, 80, 0.4);
     box-shadow: 0 0 12px rgba(76, 175, 80, 0.1);
 }
 
-.signal-graph-label {
-    font-family: monospace;
-    font-size: 0.72rem;
-    color: #78909c;
-    margin-bottom: 4px;
+.signal-ship-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(79, 195, 247, 0.08);
+    margin-bottom: 4px;
 }
 
-/* event type badges */
-.signal-graph-label .event-tag {
-    font-size: 0.65rem;
-    padding: 2px 6px;
-    border-radius: 4px;
+.signal-ship-name {
+    font-family: monospace;
+    font-size: 0.7rem;
+    color: #90a4ae;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.04em;
 }
 
-.event-tag.idle      { background: rgba(120,144,156,0.2); color: #90a4ae; }
-.event-tag.echo      { background: rgba(76,175,80,0.2);   color: #66bb6a; }
-.event-tag.incoming  { background: rgba(255,183,77,0.2);   color: #ffb74d; }
-.event-tag.shockwave { background: rgba(239,83,80,0.2);    color: #ef5350; }
+/* --- individual signal row (label + canvas) --- */
+.signal-row {
+    position: relative;
+}
 
-.signal-canvas {
+.signal-row-label {
+    font-family: monospace;
+    font-size: 0.6rem;
+    color: #546e7a;
+    margin-bottom: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.signal-canvas-small {
     width: 100%;
-    height: 80px;
+    height: 55px;
     display: block;
-    border-radius: 4px;
+    border-radius: 3px;
+    background: rgba(0, 5, 15, 0.9);
 }
 
-/* CRT scanline overlay for that retro sonar feel */
-.signal-graph-container::after {
+/* CRT scanline overlay */
+.signal-row::after {
     content: '';
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
@@ -818,28 +827,58 @@ button:disabled {
         0deg,
         transparent,
         transparent 2px,
-        rgba(0, 0, 0, 0.08) 2px,
-        rgba(0, 0, 0, 0.08) 4px
+        rgba(0, 0, 0, 0.05) 2px,
+        rgba(0, 0, 0, 0.05) 4px
     );
-    border-radius: 8px;
+    border-radius: 3px;
 }
 
-/* --- Signal playback controls --- */
-.signal-playback-bar {
+/* --- per-ship playback controls --- */
+.signal-ship-controls {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-top: 10px;
-    padding: 6px 10px;
+    gap: 4px;
+    margin-top: 4px;
+    padding: 4px 6px;
     background: rgba(13, 17, 23, 0.85);
-    border: 1px solid rgba(79, 195, 247, 0.1);
-    border-radius: 8px;
+    border: 1px solid rgba(79, 195, 247, 0.08);
+    border-radius: 6px;
 }
 
-.signal-playback-bar.hidden {
+.signal-ship-controls.hidden {
     display: none;
 }
 
+/* --- detection readout --- */
+.signal-detection-readout {
+    font-family: monospace;
+    font-size: 0.65rem;
+    color: #546e7a;
+    text-align: center;
+    padding: 4px 0 2px;
+    min-height: 18px;
+}
+
+.signal-detection-readout.has-detection {
+    color: #66bb6a;
+    text-shadow: 0 0 4px rgba(76, 175, 80, 0.3);
+}
+
+/* --- event type badges (keep from Week 3) --- */
+.event-tag {
+    font-size: 0.55rem;
+    padding: 2px 5px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.event-tag.idle      { background: rgba(120,144,156,0.2); color: #90a4ae; }
+.event-tag.echo      { background: rgba(76,175,80,0.2);   color: #66bb6a; }
+.event-tag.incoming  { background: rgba(255,183,77,0.2);   color: #ffb74d; }
+.event-tag.shockwave { background: rgba(239,83,80,0.2);    color: #ef5350; }
+
+/* --- reuse playback button/scrubber styles from Week 3, but smaller --- */
 .signal-playback-btn {
     background: rgba(79, 195, 247, 0.15);
     border: 1px solid rgba(79, 195, 247, 0.25);
@@ -889,4 +928,25 @@ button:disabled {
     color: #78909c;
     min-width: 40px;
     text-align: right;
+}
+
+.signal-ship-controls .signal-playback-btn {
+    font-size: 0.7rem;
+    padding: 3px 7px;
+}
+
+.signal-ship-controls .signal-scrubber {
+    flex: 1;
+}
+
+.signal-ship-controls .signal-time-readout {
+    font-size: 0.6rem;
+    min-width: 32px;
+}
+
+/* --- responsive: stack columns vertically on narrow screens --- */
+@media (max-width: 900px) {
+    .signal-grid {
+        grid-template-columns: 1fr;
+    }
 }

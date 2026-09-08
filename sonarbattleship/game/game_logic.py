@@ -1,7 +1,7 @@
 """
 game_logic.py — Core game rules and mechanics.
 
-Ship fleet config, placement validation, sonar (angular bearing-based),
+Ship fleet config, placement validation, sonar (angular bearing-based + DSP),
 fire processing, and win condition checks.
 """
 
@@ -9,6 +9,8 @@ import math
 import random
 
 from game.models import Ship
+from game.signal_engine import generate_sonar_echo
+from game.signal_processor import process_signal
 
 
 # ============================================================
@@ -149,6 +151,72 @@ def angular_sonar(origin_row, origin_col, angle_degrees, enemy_player, grid_size
         "bearing": angle_degrees,
         "origin": [origin_row, origin_col]
     }
+
+
+def dsp_sonar(origin_row, origin_col, angle_degrees, enemy_player,
+             my_player, grid_size, my_position='left'):
+    """
+    DSP-driven sonar: generates a real acoustic signal, processes it
+    through FFT + matched filter, and returns what the DSP extracts.
+    Unlike angular_sonar(), this does NOT peek at the true distance.
+    """
+    origin = [origin_row, origin_col]
+
+    # get my ships as dicts for the signal engine
+    my_ships = [{
+        'size': s.size, 'cells': s.cells,
+        'hit_cells': s.hit_cells, 'is_sunk': s.is_sunk,
+    } for s in Ship.objects.filter(player=my_player)]
+
+    # get enemy ships (signal engine needs them to place echoes)
+    enemy_ships = [{
+        'cells': s.cells, 'hit_cells': s.hit_cells, 'is_sunk': s.is_sunk,
+    } for s in Ship.objects.filter(player=enemy_player)]
+
+    # generate the raw signal (physics sim — echo is buried in noise)
+    raw_signals = generate_sonar_echo(
+        origin,
+        angle_degrees,
+        my_ships,
+        enemy_ships,
+        grid_size,
+        my_position
+    )
+
+    # find which ship is closest to the origin cell (that's our "ear")
+    best_ship_idx = 0
+    best_dist = float('inf')
+    for idx, ship in enumerate(my_ships):
+        cell = ship['cells'][0]
+        d = math.sqrt((cell[0] - origin_row)**2 + (cell[1] - origin_col)**2)
+        if d < best_dist:
+            best_dist = d
+            best_ship_idx = idx
+
+    origin_signal = raw_signals[best_ship_idx]['signal']
+
+    # run the DSP pipeline
+    dsp_result = process_signal(origin_signal)
+
+    # return what the DSP found (NOT the true distance)
+    if dsp_result['detected'] and dsp_result['signal_type'] == 'sonar':
+        return {
+            'distance': dsp_result['estimated_distance'],
+            'contact': True,
+            'confidence': dsp_result['confidence'],
+            'bearing': angle_degrees,
+            'origin': origin,
+            'dsp_driven': True,
+        }
+    else:
+        return {
+            'distance': -1,
+            'contact': False,
+            'confidence': dsp_result['confidence'],
+            'bearing': angle_degrees,
+            'origin': origin,
+            'dsp_driven': True,
+        }
 
 
 # ============================================================

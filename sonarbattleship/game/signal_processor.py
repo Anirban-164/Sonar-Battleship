@@ -96,6 +96,9 @@ def matched_filter(filtered_signal, template):
     delay_samples = peak_index - center_offset
     estimated_delay = delay_samples/SAMPLE_RATE
 
+    return correlation.tolist(), int(peak_index), peak_value, estimated_delay
+
+
 def classify_signal(signal, sample_rate = SAMPLE_RATE):
     """
     Determine whether a detected signal is sonar or bomb
@@ -110,11 +113,11 @@ def classify_signal(signal, sample_rate = SAMPLE_RATE):
 
     power = np.abs(X)**2
 
-    sonar_mask = (freqs >= SONAR_BAND[0]) and (freqs <= SONAR_BAND[1])
-    bomb_mask = (freqs >= BOMB_BAND[0]) and (freqs <= BOMB_BAND[1])
+    sonar_mask = (freqs >= SONAR_BAND[0]) & (freqs <= SONAR_BAND[1])
+    bomb_mask = (freqs >= BOMB_BAND[0]) & (freqs <= BOMB_BAND[1])
 
-    sonar_energy = np.sum(power[sonar_mask])
-    bomb_energy = np.sum(power[bomb_mask])
+    sonar_energy = float(np.sum(power[sonar_mask]))
+    bomb_energy = float(np.sum(power[bomb_mask]))
 
     min_energy = 0.01
     if sonar_energy < min_energy and bomb_energy < min_energy:
