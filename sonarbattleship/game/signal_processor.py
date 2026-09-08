@@ -7,10 +7,13 @@ from game.signal_engine import (
 )
 
 # ----- Detection thresholds -----
-# peak correlation value must exceed this to count as a detection.
-# tuned against NOISE_LEVEL=0.15: low enough to catch real echoes,
-# high enough to reject most noise spikes.
-DETECTION_THRESHOLD = 0.08
+# Peak correlation value must exceed this to count as a detection.
+# NOISE_LEVEL=0.15 (AWGN sigma). Matched-filter output on pure noise
+# has a standard deviation of ~1/sqrt(N) ≈ 0.04 for N=600 samples,
+# but random spikes can easily hit 0.08. Setting the threshold at 0.30
+# gives a comfortable margin above the noise floor while still catching
+# real echoes (which typically peak at 0.4-0.9 after attenuation).
+DETECTION_THRESHOLD = 0.30
 CLASSIFICATION_MARGIN = 1.5  # Sonar band must have 1.5x more energy than bomb band --> otherwise consider it a stronger shockwave
 
 
@@ -140,61 +143,66 @@ def process_signal(raw_signal):
     3. Peak detection + distance estimate
     4. Signal type classification
     Returns dict with all three signal layers + detection results.
+
+    Display layers:
+      - raw_signal     : the unprocessed received waveform (drawn as 'noise' canvas)
+      - filtered_signal: bandpass-filtered version — visually distinct from raw
+      - detected_signal: matched-filter (correlation) output — peaks indicate detection
     """
 
     signal = np.array(raw_signal)
 
-    # check for sonar bands
+    # Try sonar band first
     sonar_filtered, sonar_noise, sonar_spectrum = bandpass_filter(signal, SONAR_BAND)
     sonar_template = generate_template('sonar')
-    
     sonar_corr, sonar_peak_idx, sonar_peak_val, sonar_delay = matched_filter(sonar_filtered, sonar_template)
 
-    # check for bomb bands
+    # Try bomb band
     bomb_filtered, bomb_noise, bomb_spectrum = bandpass_filter(signal, BOMB_BAND)
     bomb_template = generate_template('bomb')
-
     bomb_corr, bomb_peak_idx, bomb_peak_val, bomb_delay = matched_filter(bomb_filtered, bomb_template)
 
-    # decision
+    # Decision: neither channel clears the threshold → no detection
     detected = False
     signal_type = 'unknown'
-    est_dist = None # estimated distance in grid cells
+    est_dist = None
     confidence = 0.0
-    
+
     if sonar_peak_val <= DETECTION_THRESHOLD and bomb_peak_val <= DETECTION_THRESHOLD:
+        # No event detected — show sonar-band filtered output by default
         filtered = sonar_filtered
-        noise = sonar_noise
         correlation = sonar_corr
         peak_idx = sonar_peak_idx
-
     else:
         detected = True
-        signal_type = classify_signal(signal)  # fidn signal type
-        
+        signal_type = classify_signal(signal)
+
         if signal_type == 'sonar':
             confidence = sonar_peak_val
             est_dist = abs(sonar_delay) / DELAY_PER_CELL
             filtered = sonar_filtered
-            noise = sonar_noise
             correlation = sonar_corr
             peak_idx = sonar_peak_idx
         else:
             confidence = bomb_peak_val
             est_dist = abs(bomb_delay) / DELAY_PER_CELL
             filtered = bomb_filtered
-            noise = bomb_noise
             correlation = bomb_corr
             peak_idx = bomb_peak_idx
 
     return {
-        # the three signal layers for display
-        'raw_signal': raw_signal,
-        'noise_component': noise.tolist(),
+        # Raw waveform: displayed on the 'noise' canvas so the user sees
+        # the unfiltered signal and can compare it against the filtered version.
+        'raw_signal':      raw_signal,
+        # Bandpass-filtered signal: displayed on the 'filtered' canvas.
+        # This is visually distinct from the raw signal — high-freq noise
+        # is removed, leaving only the band of interest.
+        'noise_component': filtered.tolist(),
+        # Matched-filter (cross-correlation) output: peaks indicate detection.
         'detected_signal': correlation,
-        'detected': detected,
-        'signal_type': signal_type,
-        'confidence': round(confidence, 4),
+        'detected':        detected,
+        'signal_type':     signal_type,
+        'confidence':      round(confidence, 4),
         'estimated_distance': round(est_dist, 2) if est_dist else None,
-        'peak_sample_index': peak_idx, # for drawing the peak marker
+        'peak_sample_index':  peak_idx,
     }

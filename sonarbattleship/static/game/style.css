@@ -49,7 +49,7 @@ body {
     border-radius: 12px;
     padding: 24px;
     flex: 1;
-    min-width: 240px;
+    min-width: 200px;
 }
 
 .panel h2 {
@@ -425,21 +425,39 @@ button:disabled {
     box-shadow: 0 0 12px rgba(25, 118, 210, 0.4);
 }
 
+/* === Game Main Area — Grid + Sidebar side by side === */
+.game-main-area {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    justify-content: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+/* Sidebar for sonar/fire controls — sits beside the grid */
+.game-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 220px;
+    max-width: 260px;
+    flex-shrink: 0;
+}
+
 /* === Combined Grid === */
 .combined-grid-wrapper {
     text-align: center;
-    margin-bottom: 16px;
     overflow-x: auto;
     position: relative;
-    /* Ensure it contains the overlay */
+    flex: 1;
+    min-width: 0;
 }
 
 .grid-overlay-container {
     position: relative;
     display: inline-block;
-    /* Hugs the grid exactly */
     overflow: hidden;
-    /* Clip the sonar beam at grid edges */
 }
 
 #sonar-beam-overlay {
@@ -475,7 +493,6 @@ button:disabled {
 }
 
 .grid-label-left {
-    /* Offset for row header (30px) + half grid */
     margin-left: 30px;
     flex: 1;
     text-align: center;
@@ -534,7 +551,7 @@ button:disabled {
     cursor: crosshair;
 }
 
-/* === Game Bottom Panel === */
+/* === Game Bottom Panel (sonar log, results — below grid) === */
 .game-bottom-panel {
     display: flex;
     gap: 16px;
@@ -554,7 +571,7 @@ button:disabled {
     border: 1px solid #2a3040;
     border-radius: 12px;
     padding: 16px;
-    min-width: 220px;
+    width: 100%;
 }
 
 .angle-picker-wrapper {
@@ -761,6 +778,7 @@ button:disabled {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 12px;
+    width: 100%;
 }
 
 .signal-ship-col {
@@ -771,6 +789,8 @@ button:disabled {
     display: flex;
     flex-direction: column;
     gap: 4px;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .signal-ship-col.has-echo {
@@ -815,6 +835,7 @@ button:disabled {
     display: block;
     border-radius: 3px;
     background: rgba(0, 5, 15, 0.9);
+    max-width: 100%;
 }
 
 /* CRT scanline overlay */
@@ -948,5 +969,18 @@ button:disabled {
 @media (max-width: 900px) {
     .signal-grid {
         grid-template-columns: 1fr;
+    }
+
+    .game-main-area {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .game-sidebar {
+        max-width: 100%;
+        width: 100%;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
     }
 }

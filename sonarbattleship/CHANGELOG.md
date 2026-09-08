@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.2] — 2026-09-09
+
+### Fixed
+- **False Detection on Idle Signals**: Raised `DETECTION_THRESHOLD` from `0.08` to `0.30` in `signal_processor.py`. The old threshold was too low — pure ocean noise (AWGN with σ=0.15) routinely produced random matched-filter peaks above 0.08, causing the system to falsely report bomb or sonar detections when nothing had happened. The new threshold of 0.30 sits comfortably above the noise floor (~0.04 σ) while still catching real echoes (which peak at 0.4–0.9 after attenuation).
+- **Filtered Signal & Noise Signal Looked Identical**: The `noise_component` output from `process_signal()` was previously set to `signal - filtered_signal` (the high-frequency residue removed by the bandpass filter). For broadband AWGN, this residue looks nearly identical to the raw signal, making the "Filtered Noise" and "Raw Signal" oscilloscope canvases indistinguishable. Now `noise_component` carries the **bandpass-filtered signal** instead, which is visually distinct — smoother, narrower band, lower amplitude.
+- **Idle Oscilloscope Canvas Differentiation**: Updated the frontend idle animation so the "Filtered Signal" canvas uses IIR-smoothed low-amplitude noise (simulating bandpass filter output on AWGN) instead of raw Gaussian jitter, making it clearly distinct from the "Raw Signal" canvas at all times.
+
+### Changed
+- **Oscilloscope Layer Label**: Renamed the middle oscilloscope layer from "Filtered Noise" to "Filtered Signal" in `room.html` to accurately reflect that it now displays the bandpass-filtered waveform rather than the removed noise component.
+
+## [0.5.1] — 2026-09-09
+
+
+### Fixed
+- **Oscilloscope 3×3 Grid Layout**: Fixed the signal processing panel so it correctly renders as a 3-column × 3-row grid (one column per ship, three signal layers per column). Previously the columns collapsed into 9 vertically stacked bars. Added `min-width: 0` and `overflow: hidden` to `.signal-ship-col` to prevent CSS grid blowout, and introduced a `ResizeObserver` to dynamically size each canvas to its container width instead of using a hardcoded 600px.
+- **Pause-Rewind Scrubber**: The scrubber now performs a true time-domain rewind. Dragging the slider backward shows a partial waveform up to the scrub position (`signal.slice(0, sampleIdx + 1)`) on all three layers (raw, noise, detection), giving the visual effect of rewinding through the signal. Previously, the scrubber only drew a static yellow cursor line over the frozen full waveform, which was non-functional and confusing.
+- **Idle Signal Differentiation**: The three oscilloscope layers now display visually distinct traces during idle (no-event) mode. Raw Signal shows full-amplitude ambient ocean noise (cyan), Filtered Noise shows low-amplitude residual jitter (gray, ×0.04 scale), and Detection Output shows a near-flat baseline (green, ×0.02 scale). Previously all three layers rendered identical noise at the same amplitude and color, making them indistinguishable.
+
+### Changed
+- **Sonar Controls Placement**: Moved the sonar angle picker, origin selector, fire hint, action result panel, and sonar readings log from the bottom panel (below the grid) into a sidebar that sits beside the combined grid. This eliminates the need to scroll up and down between the controls and the grid during gameplay. The layout uses a new `.game-main-area` flex container with a `.game-sidebar` (fixed 220–260px width) alongside the grid. On narrow screens (<900px), the sidebar stacks above the grid.
+
 ## [0.5.0] — 2026-09-01
 
 ### Added
