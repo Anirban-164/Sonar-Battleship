@@ -1,4 +1,3 @@
-
 import numpy as np
 import math
 
@@ -73,6 +72,7 @@ def generate_ocean_noise(num_samples=NUM_SAMPLES):
         Noise signal of shape (num_samples,)
     """
     return np.random.normal(0, NOISE_LEVEL, num_samples)
+
 
 ################# sonar  ping ################
 def _in_beam(origin, target, angle, half_width=10):
@@ -162,13 +162,7 @@ def generate_sonar_echo(origin, angle_deg, my_ships, enemy_ships, grid_size, sid
                 continue
 
             # Check if within beam
-            cell_bearing = math.degrees(math.atan2(dc, -dr))
-            if cell_bearing < 0:
-                cell_bearing += 360
-            diff = abs(cell_bearing - angle_deg) % 360
-            if diff > 180:
-                diff = 360 - diff
-            if diff <= BEAM_WIDTH/2:
+            if _in_beam(origin, (cr, eff_cc), angle_deg, BEAM_WIDTH/2):
                 min_enemy_dist = min(min_enemy_dist, dist)
 
     has_echo = min_enemy_dist < float('inf')
@@ -211,13 +205,9 @@ def generate_sonar_echo(origin, angle_deg, my_ships, enemy_ships, grid_size, sid
 # ============================================================
 def generate_incoming_sonar_signals(enemy_origin,angle_deg,my_ships,grid_size,my_position='left'):
     """
-    When the enemy fires sonar, the ping pulse travels through the
-    water. Each of our ships in or near the beam path picks up
-    the incoming signal. The nearest ship gets the highest amplitude
-    bump; farther ships get weaker signals.
+    When the enemy fires sonar, the ping pulse travels through the water. Each of our ships in or near the beam path picks up the incoming signal. The nearest ship gets the highest amplitude bump; farther ships get weaker signals.
 
-    This is a DIRECT arrival (not an echo), so there's no round-trip —
-    the delay is one-way: d / v_sound.
+    This is a DIRECT arrival (not an echo), so there's no round-trip — the delay is one-way: d / v_sound.
 
     Parameters
     ----------
@@ -262,21 +252,8 @@ def generate_incoming_sonar_signals(enemy_origin,angle_deg,my_ships,grid_size,my
             dist = math.sqrt(dr ** 2 + dc ** 2)
             # Check if this cell is within the enemy's beam
             BEAM_HALF_WIDTH = 10
-            in_beam = False
-            if dist > 0.1:
-                cell_bearing = math.degrees(math.atan2(dc,-dr))
-
-                if cell_bearing < 0:
-                    cell_bearing += 360
-
-                diff = abs(cell_bearing - angle_deg) % 360
-                if diff > 180:
-                    diff = 360 - diff
-                    in_beam = diff <= BEAM_HALF_WIDTH * 2 # wider detection
-            else:
-                in_beam = True
-
-            if in_beam:
+           
+            if _in_beam(enemy_origin, (cr, effective_cc), angle_deg, half_width=BEAM_HALF_WIDTH * 2):
                 # One-way delay (not round-trip)
                 delay = distance_to_delay(dist)/2.0
                 amp = attenuate(SONAR_AMPLITUDE*0.8,dist)
