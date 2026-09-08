@@ -19,14 +19,82 @@ BOMB_BAND  = (0.5, 4.0)   # Hz — pass frequencies in this range for bomb detec
 
 
 def bandpass_filter(signal, band, sample_rate=SAMPLE_RATE):
-    pass
+    """FFT-based bandpass filter:
+    1. FFT the signal to get frequency components
+    2. Zero out everything outside the given range
+    3. IFFT back to time domain
+    Returns: (filtered_signal, noise_component, frequency_spectrum)
+    """
+    N = len(signal)
+    low_freq, high_freq = band
+
+    X = np.fft.rfft(signal) #FFT the whole signal to get frequency components
+    freqs = np.fft.rfftfreq(N,d=1.0/sample_rate) 
+
+    #Keeping track of the frequencies in range
+    mask = np.zeros_like(freqs,dtype=float) 
+    in_band = (freqs >= low_freq) & (freqs<=high_freq)
+    mask[in_band] = 1.0
+
+
+    ## smooth edges of the mask to prevent abrupt changes
+    taper_width = 5
+    band_indices = np.where(in_band)[0]
+    if len(band_indices) > 2 * taper_width:
+        for i in range(taper_width):
+            fade = 0.5 * (1 - np.cos(np.pi*i/taper_width))
+            mask[band_indices[i]] = fade
+            mask[band_indices[-(i+1)]] = fade
+
+    # Apply the created mask and IFFT back
+    X_filtered = X * mask
+    filtered_signal = np.fft.irfft(X_filtered,n=N)
+
+    noise_component = signal - filtered_signal # the noise part
+
+    spectrum = np.abs(X)/ N # magnitude spectrum
+
+    return filtered_signal,noise_component,spectrum
+
 
 def generate_template(signal_type='sonar'):
-    pass
+    """Build the known pulse template for matched filtering.
+        This is the "reference copy" of what we transmitted - cross-
+        correlating it against the received signal finds the echo
+    """
+    t = time_axis()
 
+    if signal_type == 'sonar':
+        # Sonar template: which is Gaussian ping shape we transmit, centered at t=0.5
+        template = gaussian_ping(t,SONAR_FREQ,SONAR_SIGMA,1.0,center=0.5)
+    else:
+        template = gaussian_ping(t,BOMB_FREQ, BOMB_SIGMA,1.0,center=0.5)
+    return template
 def matched_filter(filtered_signal, template):
-    pass
+    """Cross corelate the filtered signal with the known template.
+        The peak position tells us the time delay (and thus distance).
+        The peak height tell us detection confidence.
 
+        Returns:(correlation,peak_index,peak_value,estimated_delay)
+    """
+
+    # normalize template to unit energy so peak heights are comparable
+    template_norm = template/(np.linalg.norm(template) + 1e-10)
+
+    # cross-correlation - 'same' mode keeps output length = input length
+    correlation = np.correlate(filtered_signal,template_norm,mode='same')
+
+    # find the peak
+    peak_index = np.argmax(np.abs(correlation))
+    peak_value = float(np.abs(correlation[peak_index]))
+
+    # converting sample index to time delay
+    # 'same' mode centers the output, so index 0 = -N/2 delay
+    center_offset = len(filtered_signal)//2
+    delay_samples = peak_index - center_offset
+    estimated_delay = delay_samples/SAMPLE_RATE
+
+    return correlation.tolist(),int(peak_index),peak_value,estimated_delay
 def classify_signal(signal, sample_rate=SAMPLE_RATE):
     pass
 
