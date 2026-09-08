@@ -64,71 +64,74 @@
             </div>
         </div>
 
-        <!-- Combined grid -->
-        <div class="combined-grid-wrapper">
-            <div class="grid-labels">
-                <span id="grid-label-left" class="grid-label-left">PLAYER 1</span>
-                <span id="grid-label-right" class="grid-label-right">PLAYER 2</span>
-            </div>
-            <div class="grid-overlay-container">
-                <div id="combined-grid" class="combined-grid"></div>
-                <svg id="sonar-beam-overlay" xmlns="http://www.w3.org/2000/svg"></svg>
-            </div>
-        </div>
-
-        <!-- Bottom panel -->
-        <div class="game-bottom-panel">
-            <!-- Sonar controls -->
-            <div id="sonar-controls" class="sonar-controls">
-                <div class="angle-picker-wrapper">
-                    <svg id="angle-picker" width="180" height="180" viewBox="-100 -100 200 200" style="cursor:crosshair;">
-                        <circle cx="0" cy="0" r="90" fill="rgba(13,17,23,0.8)" stroke="#2a3040" stroke-width="2"/>
-                        <!-- Major tick marks -->
-                        <line x1="0" y1="-88" x2="0" y2="-76" stroke="#546e7a" stroke-width="1.5"/>
-                        <line x1="88" y1="0" x2="76" y2="0" stroke="#546e7a" stroke-width="1.5"/>
-                        <line x1="0" y1="88" x2="0" y2="76" stroke="#546e7a" stroke-width="1.5"/>
-                        <line x1="-88" y1="0" x2="-76" y2="0" stroke="#546e7a" stroke-width="1.5"/>
-                        <!-- 45° tick marks -->
-                        <line x1="62" y1="-62" x2="54" y2="-54" stroke="#37474f" stroke-width="1"/>
-                        <line x1="62" y1="62" x2="54" y2="54" stroke="#37474f" stroke-width="1"/>
-                        <line x1="-62" y1="62" x2="-54" y2="54" stroke="#37474f" stroke-width="1"/>
-                        <line x1="-62" y1="-62" x2="-54" y2="-54" stroke="#37474f" stroke-width="1"/>
-                        <!-- Labels -->
-                        <text x="0" y="-92" text-anchor="middle" fill="#78909c" font-size="11" font-family="monospace">0°</text>
-                        <text x="96" y="4" text-anchor="start" fill="#78909c" font-size="11" font-family="monospace">90°</text>
-                        <text x="0" y="100" text-anchor="middle" fill="#78909c" font-size="11" font-family="monospace">180°</text>
-                        <text x="-96" y="4" text-anchor="end" fill="#78909c" font-size="11" font-family="monospace">270°</text>
-                        <!-- Beam wedge (filled by JS) -->
-                        <path id="beam-wedge" d="" fill="rgba(79,195,247,0.08)" stroke="none"/>
-                        <!-- Bearing line -->
-                        <line id="bearing-line" x1="0" y1="0" x2="0" y2="-80" stroke="#4fc3f7" stroke-width="3" stroke-linecap="round"/>
-                        <!-- Center dot -->
-                        <circle cx="0" cy="0" r="4" fill="#4fc3f7"/>
-                    </svg>
-                    <div class="angle-readout">
-                        <input type="number" id="angle-input" min="0" max="359" value="0" onchange="setAngleFromInput()"/>
-                        <span class="angle-deg">°</span>
+        <!-- Main game area: Sidebar + Grid side by side -->
+        <div class="game-main-area">
+            <!-- Sidebar: sonar controls, fire hint, action result, sonar log -->
+            <div class="game-sidebar">
+                <!-- Sonar controls -->
+                <div id="sonar-controls" class="sonar-controls">
+                    <div class="angle-picker-wrapper">
+                        <svg id="angle-picker" width="180" height="180" viewBox="-100 -100 200 200" style="cursor:crosshair;">
+                            <circle cx="0" cy="0" r="90" fill="rgba(13,17,23,0.8)" stroke="#2a3040" stroke-width="2"/>
+                            <!-- Major tick marks -->
+                            <line x1="0" y1="-88" x2="0" y2="-76" stroke="#546e7a" stroke-width="1.5"/>
+                            <line x1="88" y1="0" x2="76" y2="0" stroke="#546e7a" stroke-width="1.5"/>
+                            <line x1="0" y1="88" x2="0" y2="76" stroke="#546e7a" stroke-width="1.5"/>
+                            <line x1="-88" y1="0" x2="-76" y2="0" stroke="#546e7a" stroke-width="1.5"/>
+                            <!-- 45° tick marks -->
+                            <line x1="62" y1="-62" x2="54" y2="-54" stroke="#37474f" stroke-width="1"/>
+                            <line x1="62" y1="62" x2="54" y2="54" stroke="#37474f" stroke-width="1"/>
+                            <line x1="-62" y1="62" x2="-54" y2="54" stroke="#37474f" stroke-width="1"/>
+                            <line x1="-62" y1="-62" x2="-54" y2="-54" stroke="#37474f" stroke-width="1"/>
+                            <!-- Labels -->
+                            <text x="0" y="-92" text-anchor="middle" fill="#78909c" font-size="11" font-family="monospace">0°</text>
+                            <text x="96" y="4" text-anchor="start" fill="#78909c" font-size="11" font-family="monospace">90°</text>
+                            <text x="0" y="100" text-anchor="middle" fill="#78909c" font-size="11" font-family="monospace">180°</text>
+                            <text x="-96" y="4" text-anchor="end" fill="#78909c" font-size="11" font-family="monospace">270°</text>
+                            <!-- Beam wedge (filled by JS) -->
+                            <path id="beam-wedge" d="" fill="rgba(79,195,247,0.08)" stroke="none"/>
+                            <!-- Bearing line -->
+                            <line id="bearing-line" x1="0" y1="0" x2="0" y2="-80" stroke="#4fc3f7" stroke-width="3" stroke-linecap="round"/>
+                            <!-- Center dot -->
+                            <circle cx="0" cy="0" r="4" fill="#4fc3f7"/>
+                        </svg>
+                        <div class="angle-readout">
+                            <input type="number" id="angle-input" min="0" max="359" value="0" onchange="setAngleFromInput()"/>
+                            <span class="angle-deg">°</span>
+                        </div>
                     </div>
+                    <div id="sonar-origin-hint" class="sonar-origin-hint">
+                        <p>📡 Select an <strong>undamaged ship cell</strong> on your grid, then choose a bearing</p>
+                        <p id="sonar-origin-display" class="sonar-origin-display" style="display:none;"></p>
+                    </div>
+                    <button id="btn-ping" onclick="fireSonar()" class="ping-btn" disabled>📡 Ping Sonar</button>
                 </div>
-                <div id="sonar-origin-hint" class="sonar-origin-hint">
-                    <p>📡 Select an <strong>undamaged ship cell</strong> on your grid, then choose a bearing</p>
-                    <p id="sonar-origin-display" class="sonar-origin-display" style="display:none;"></p>
+
+                <!-- Fire hint (shown when fire mode selected) -->
+                <div id="fire-hint" class="fire-hint" style="display:none;">
+                    <p>💥 Click on the <strong>Enemy Waters</strong> grid to fire</p>
                 </div>
-                <button id="btn-ping" onclick="fireSonar()" class="ping-btn" disabled>📡 Ping Sonar</button>
+
+                <!-- Action result -->
+                <div id="action-result" class="result-panel" style="display:none;"></div>
+
+                <!-- Sonar log -->
+                <div id="sonar-log" class="sonar-log">
+                    <h4>Sonar Readings</h4>
+                    <ul id="sonar-readings"></ul>
+                </div>
             </div>
 
-            <!-- Fire hint (shown when fire mode selected) -->
-            <div id="fire-hint" class="fire-hint" style="display:none;">
-                <p>💥 Click on the <strong>Enemy Waters</strong> grid to fire</p>
-            </div>
-
-            <!-- Action result -->
-            <div id="action-result" class="result-panel" style="display:none;"></div>
-
-            <!-- Sonar log -->
-            <div id="sonar-log" class="sonar-log">
-                <h4>Sonar Readings</h4>
-                <ul id="sonar-readings"></ul>
+            <!-- Combined grid -->
+            <div class="combined-grid-wrapper">
+                <div class="grid-labels">
+                    <span id="grid-label-left" class="grid-label-left">PLAYER 1</span>
+                    <span id="grid-label-right" class="grid-label-right">PLAYER 2</span>
+                </div>
+                <div class="grid-overlay-container">
+                    <div id="combined-grid" class="combined-grid"></div>
+                    <svg id="sonar-beam-overlay" xmlns="http://www.w3.org/2000/svg"></svg>
+                </div>
             </div>
         </div>
 
@@ -1251,9 +1254,9 @@
     };
 
     const LAYERS = [
-        { key: 'raw',      label: 'Raw Signal',      color: '#4fc3f7' },
-        { key: 'noise',    label: 'Filtered Noise',   color: '#78909c' },
-        { key: 'detected', label: 'Detection Output', color: '#66bb6a' },
+        { key: 'raw',      label: 'Raw Signal',        color: '#4fc3f7' },
+        { key: 'noise',    label: 'Filtered Signal',   color: '#78909c' },
+        { key: 'detected', label: 'Detection Output',  color: '#66bb6a' },
     ];
 
     // builds 3 columns (one per ship), each with 3 canvas rows + controls
@@ -1290,8 +1293,9 @@
                 const canvas = document.createElement('canvas');
                 canvas.className = 'signal-canvas-small';
                 canvas.id = `signal-canvas-${idx}-${layer.key}`;
-                canvas.width = 600;
                 canvas.height = 55;
+                // Width is set dynamically by ResizeObserver below
+                canvas.width = 300;
 
                 row.appendChild(label);
                 row.appendChild(canvas);
@@ -1324,11 +1328,30 @@
             grid.appendChild(col);
         });
 
+        // Dynamically size canvases to fit their column width
+        resizeSignalCanvases();
+        const resizeObserver = new ResizeObserver(() => resizeSignalCanvases());
+        resizeObserver.observe(grid);
+
         signalPanelBuilt = true;
         startIdleAnimation();
     }
 
-    // --- idle animation: noise on all 3 layers per ship ---
+    function resizeSignalCanvases() {
+        if (!gameState || !gameState.my_ships) return;
+        gameState.my_ships.forEach((ship, idx) => {
+            LAYERS.forEach(layer => {
+                const canvas = document.getElementById(`signal-canvas-${idx}-${layer.key}`);
+                if (!canvas) return;
+                const parentWidth = canvas.parentElement.clientWidth;
+                if (parentWidth > 0 && canvas.width !== parentWidth) {
+                    canvas.width = parentWidth;
+                }
+            });
+        });
+    }
+
+    // --- idle animation: distinct traces per layer per ship ---
     function startIdleAnimation() {
         if (idleAnimFrame) cancelAnimationFrame(idleAnimFrame);
 
@@ -1338,19 +1361,47 @@
             gameState.my_ships.forEach((ship, idx) => {
                 if (shipPaused[idx]) return;
 
-                ['raw', 'noise', 'detected'].forEach(layer => {
-                    const canvas = document.getElementById(`signal-canvas-${idx}-${layer}`);
-                    if (!canvas) return;
-
-                    const noise = [];
-                    for (let i = 0; i < canvas.width; i++) {
+                // RAW SIGNAL: Full ambient ocean noise (unfiltered hydrophone pickup)
+                const rawCanvas = document.getElementById(`signal-canvas-${idx}-raw`);
+                if (rawCanvas) {
+                    const rawNoise = [];
+                    for (let i = 0; i < rawCanvas.width; i++) {
                         const u1 = Math.random();
                         const u2 = Math.random();
                         const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-                        noise.push(z * 0.15);
+                        rawNoise.push(z * 0.15); // full broadband noise
                     }
-                    drawSignal(canvas, noise, '#4fc3f7', false);
-                });
+                    drawSignal(rawCanvas, rawNoise, '#4fc3f7', false);
+                }
+
+                // FILTERED SIGNAL: Bandpass-filtered version — smoother than raw, lower amplitude.
+                // During idle, the bandpass filter passes only the sonar frequency band,
+                // so the result is a narrow-band, lower-energy signal — visually distinct from raw.
+                const noiseCanvas = document.getElementById(`signal-canvas-${idx}-noise`);
+                if (noiseCanvas) {
+                    const filteredIdle = [];
+                    let prev = 0;
+                    for (let i = 0; i < noiseCanvas.width; i++) {
+                        // Simple low-pass smoothing to mimic bandpass output on AWGN
+                        const raw = (Math.random() * 2 - 1) * 0.07;
+                        prev = 0.6 * prev + 0.4 * raw; // IIR smoother
+                        filteredIdle.push(prev);
+                    }
+                    drawSignal(noiseCanvas, filteredIdle, '#78909c', false);
+                }
+
+                // DETECTION OUTPUT: Near-flat baseline (no correlation peak when idle)
+                const detCanvas = document.getElementById(`signal-canvas-${idx}-detected`);
+                if (detCanvas) {
+                    const detNoise = [];
+                    for (let i = 0; i < detCanvas.width; i++) {
+                        const u1 = Math.random();
+                        const u2 = Math.random();
+                        const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+                        detNoise.push(z * 0.02); // Very low — no detection
+                    }
+                    drawSignal(detCanvas, detNoise, '#66bb6a', false);
+                }
             });
 
             idleAnimFrame = requestAnimationFrame(drawIdleFrame);
@@ -1486,10 +1537,16 @@
         const layers = shipEventSignals[idx];
         if (!layers) return;
 
+        // Show partial waveform up to sampleIdx (actual rewind/scrub)
+        const endSample = sampleIdx + 1;
+        const rawSlice = layers.raw ? layers.raw.slice(0, endSample) : [];
+        const noiseSlice = layers.noise ? layers.noise.slice(0, endSample) : [];
+        const detSlice = layers.detected ? layers.detected.slice(0, endSample) : [];
+
         const detColor = shipEventColors[idx] || '#66bb6a';
-        drawSignal(document.getElementById(`signal-canvas-${idx}-raw`),      layers.raw,      '#4fc3f7', false, sampleIdx);
-        drawSignal(document.getElementById(`signal-canvas-${idx}-noise`),    layers.noise,    '#78909c', false, sampleIdx);
-        drawSignal(document.getElementById(`signal-canvas-${idx}-detected`), layers.detected, detColor,  true,  sampleIdx);
+        drawSignal(document.getElementById(`signal-canvas-${idx}-raw`),      rawSlice,   '#4fc3f7', false);
+        drawSignal(document.getElementById(`signal-canvas-${idx}-noise`),    noiseSlice, '#78909c', false);
+        drawSignal(document.getElementById(`signal-canvas-${idx}-detected`), detSlice,   detColor,  true);
     }
 
     function resumeShipIdle(idx) {
