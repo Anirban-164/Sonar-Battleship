@@ -1,3 +1,31 @@
+/* ============================================
+   Typography — military
+   --------------------------------------------
+   Two faces doing two jobs. Headings and hull
+   markings are stencilled, the way a pennant
+   number is sprayed onto a sail. Everything that
+   reports a measurement — bearings, ranges,
+   confidence, the contact log — is set in a
+   technical monospace, so digits line up in
+   columns and the readouts scan like instruments
+   rather than like prose. Saira Condensed carries
+   the in-between UI text, where stencil would be
+   unreadable at small sizes.
+   ============================================ */
+:root {
+    --font-stencil: 'Black Ops One', 'Stardos Stencil', Impact, 'Arial Black', sans-serif;
+    --font-mono: 'Share Tech Mono', 'JetBrains Mono', ui-monospace, 'Courier New', monospace;
+    --font-ui: 'Saira Condensed', 'Segoe UI', system-ui, sans-serif;
+
+    --mil-green: #7ee787;
+    --mil-amber: #ffb74d;
+    --mil-red: #ef5350;
+    --mil-cyan: #4fc3f7;
+    --mil-steel: #546e7a;
+    --mil-rule: rgba(79, 195, 247, 0.22);
+    --mil-panel: rgba(8, 12, 18, 0.9);
+}
+
 /* === Reset & Base === */
 * {
     margin: 0;
@@ -6,7 +34,8 @@
 }
 
 body {
-    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-ui);
+    letter-spacing: 0.01em;
     background: #0a0e17;
     background-image: url('../images/background.png');
     background-size: cover;
@@ -466,6 +495,16 @@ button:disabled {
     left: 0;
     pointer-events: none;
     z-index: 10;
+}
+
+/* Hostile-transmission marker. Sits just under the beam overlay so our
+   own aiming beam always draws on top of it. */
+#passive-contact-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    z-index: 9;
 }
 
 .grid-labels {
@@ -983,4 +1022,593 @@ button:disabled {
         flex-wrap: wrap;
         justify-content: center;
     }
-}
+}
+/* ============================================================
+   MILITARY TYPOGRAPHY PASS
+   Applied after the original rules so it overrides them without
+   having to unpick the existing layout.
+   ============================================================ */
+
+h1, h2, h3,
+.home-container h1,
+.room-header h1 {
+    font-family: var(--font-stencil);
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+h4, h5 {
+    font-family: var(--font-ui);
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+/* Hull markings down the sides of the board */
+.grid-label-left,
+.grid-label-right {
+    font-family: var(--font-stencil);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+/* Status chips read like a stencilled placard, not a pill */
+.badge {
+    font-family: var(--font-mono);
+    border-radius: 2px;
+    letter-spacing: 0.16em;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+/* Anything that reports a number is an instrument */
+.turn-mine,
+.turn-opponent,
+.angle-readout input,
+.angle-deg,
+.sonar-origin-display,
+.result-panel,
+.signal-ship-name,
+.signal-row-label,
+.signal-detection-readout,
+.signal-time-readout,
+.ship-status,
+.grid-cell.grid-header {
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
+}
+
+.action-btn,
+.ping-btn,
+.btn-rotate,
+.signal-playback-btn {
+    font-family: var(--font-ui);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.signal-panel-title {
+    font-family: var(--font-stencil);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+/* ============================================================
+   MILITARY DATA PANELS & CONTACT TABLES
+   ============================================================ */
+
+.mil-panel {
+    background: var(--mil-panel);
+    border: 1px solid var(--mil-rule);
+    border-radius: 2px;
+    /* corner ticks, like a printed form */
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    margin-bottom: 10px;
+    overflow: hidden;
+}
+
+.mil-panel-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 9px;
+    background: linear-gradient(180deg, rgba(79, 195, 247, 0.13), rgba(79, 195, 247, 0.03));
+    border-bottom: 1px solid var(--mil-rule);
+}
+
+.mil-panel-title {
+    font-family: var(--font-stencil);
+    font-size: 0.66rem;
+    letter-spacing: 0.1em;
+    color: #cfe9f7;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mil-panel-meta {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    color: var(--mil-steel);
+    white-space: nowrap;
+}
+
+.mil-table-wrap {
+    max-height: 168px;
+    overflow-y: auto;
+    overflow-x: auto;
+}
+
+.mil-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+
+.mil-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #0b1119;
+    color: #7fa8bd;
+    font-weight: 400;
+    text-align: left;
+    padding: 4px 7px;
+    border-bottom: 1px solid var(--mil-rule);
+    letter-spacing: 0.12em;
+}
+
+.mil-table tbody td {
+    padding: 3px 7px;
+    border-bottom: 1px dashed rgba(84, 110, 122, 0.22);
+    color: #c9d6de;
+}
+
+.mil-table tbody tr:nth-child(odd) td {
+    background: rgba(255, 255, 255, 0.018);
+}
+
+.mil-table tbody tr:hover td {
+    background: rgba(79, 195, 247, 0.07);
+}
+
+.mil-table .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.mil-empty td {
+    color: var(--mil-steel);
+    text-align: center;
+    font-style: normal;
+    letter-spacing: 0.14em;
+    padding: 10px 6px;
+}
+
+/* Status chips inside the tables */
+.mil-chip {
+    display: inline-block;
+    padding: 0 5px;
+    border-radius: 2px;
+    border: 1px solid currentColor;
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    line-height: 1.45;
+}
+
+.mil-chip.ok      { color: var(--mil-green); }
+.mil-chip.none    { color: var(--mil-steel); }
+.mil-chip.blocked { color: var(--mil-amber); }
+.mil-chip.alert   { color: var(--mil-red); }
+
+/* Confidence read as a small bar behind the number */
+.mil-conf {
+    position: relative;
+    display: inline-block;
+    min-width: 40px;
+    padding: 0 4px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.mil-conf::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 1px;
+    bottom: 1px;
+    width: var(--conf, 0%);
+    background: rgba(126, 231, 135, 0.22);
+    border-left: 2px solid var(--mil-green);
+    z-index: 0;
+}
+
+.mil-conf span {
+    position: relative;
+    z-index: 1;
+}
+
+/* The sonar log now hosts tables rather than a bullet list */
+.sonar-log {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    max-height: none;
+    overflow: visible;
+    min-width: 200px;
+    max-width: 300px;
+}
+
+/* ============================================================
+   PASSIVE COUNTER-DETECTION PANEL
+   The board that tells you the enemy just gave themselves away.
+   ============================================================ */
+
+.passive-panel .mil-panel-header {
+    background: linear-gradient(180deg, rgba(239, 83, 80, 0.16), rgba(239, 83, 80, 0.03));
+    border-bottom-color: rgba(239, 83, 80, 0.3);
+}
+
+.passive-panel .mil-panel-title {
+    color: #ffc9c7;
+}
+
+.passive-panel.alerting {
+    animation: passive-alert 1.1s ease-out 3;
+}
+
+@keyframes passive-alert {
+    0%, 100% { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02); }
+    50%      { box-shadow: 0 0 12px rgba(239, 83, 80, 0.5), inset 0 0 0 1px rgba(239, 83, 80, 0.4); }
+}
+
+/* Caution line under the ping button — the pinging player never learns
+   whether they were heard, so the warning has to be permanent. */
+.emcon-warning {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.06em;
+    line-height: 1.45;
+    color: var(--mil-amber);
+    border: 1px dashed rgba(255, 183, 77, 0.42);
+    border-radius: 2px;
+    padding: 5px 7px;
+    margin-top: 7px;
+    background: rgba(255, 183, 77, 0.06);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .passive-panel.alerting { animation: none; }
+}
+
+/* ============================================================
+   SIDEBAR CONSOLE — v0.7.1 layout pass
+   The sidebar was a loose stack of differently-shaped boxes.
+   Everything in it is now the same kind of panel, at the same
+   width, with one consistent gutter.
+   ============================================================ */
+
+.game-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 262px;
+    min-width: 262px;
+    max-width: 262px;
+}
+
+.game-sidebar > * {
+    width: 100%;
+}
+
+/* The bearing selector is now a mil-panel like everything else,
+   so drop the old standalone card styling. */
+.sonar-controls {
+    background: var(--mil-panel);
+    border: 1px solid var(--mil-rule);
+    border-radius: 2px;
+    padding: 0;
+    margin: 0;
+}
+
+.sonar-console {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 7px;
+    padding: 10px;
+}
+
+#angle-picker {
+    display: block;
+    width: 178px;
+    height: 178px;
+    margin: 0 auto 2px;
+}
+
+.dial-card {
+    font-family: var(--font-stencil);
+    font-size: 13px;
+    fill: #5d7f90;
+    letter-spacing: 0.05em;
+}
+
+.dial-deg {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    fill: #7fa8bd;
+    letter-spacing: 0.06em;
+}
+
+/* Key/value rows under the dial */
+.console-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 4px 7px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(84, 110, 122, 0.28);
+    border-radius: 2px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+}
+
+.console-key {
+    color: #7fa8bd;
+    letter-spacing: 0.14em;
+    font-size: 0.62rem;
+    min-width: 30px;
+}
+
+.console-input {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: none;
+    color: var(--mil-cyan);
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    letter-spacing: 0.08em;
+    padding: 0;
+    text-align: right;
+    -moz-appearance: textfield;
+}
+
+.console-input:focus {
+    outline: none;
+    color: #fff;
+}
+
+.console-input::-webkit-outer-spin-button,
+.console-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.console-unit {
+    color: var(--mil-steel);
+    font-size: 0.8rem;
+}
+
+.sonar-origin-display {
+    flex: 1;
+    text-align: right;
+    color: var(--mil-steel);
+    letter-spacing: 0.08em;
+    font-size: 0.66rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sonar-origin-display.is-set {
+    color: var(--mil-cyan);
+    font-size: 0.95rem;
+    letter-spacing: 0.1em;
+}
+
+.ping-btn {
+    width: 100%;
+    padding: 9px 10px;
+    border-radius: 2px;
+    font-size: 0.8rem;
+}
+
+/* Slimmed right down — it was five lines of shouting that pushed the
+   contact log off the bottom of the panel. */
+.emcon-warning {
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    line-height: 1.4;
+    letter-spacing: 0.03em;
+    text-transform: none;
+    color: #d7b078;
+    border: none;
+    border-left: 2px solid rgba(255, 183, 77, 0.55);
+    border-radius: 0;
+    padding: 4px 0 4px 7px;
+    margin: 0;
+    background: none;
+}
+
+.emcon-warning strong {
+    color: var(--mil-amber);
+    letter-spacing: 0.12em;
+    margin-right: 4px;
+}
+
+/* The log column holds panels directly — no scrolling wrapper of its own,
+   each table scrolls inside itself. */
+.sonar-log {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    max-height: none;
+    min-width: 0;
+    max-width: none;
+    overflow: visible;
+}
+
+.sonar-log .mil-panel {
+    margin-bottom: 0;
+}
+
+.mil-table-wrap {
+    max-height: 150px;
+}
+
+/* Give the columns room to breathe — everything ran together before. */
+.mil-table thead th,
+.mil-table tbody td {
+    padding: 4px 6px;
+}
+
+.mil-table tbody td:first-child,
+.mil-table thead th:first-child {
+    padding-left: 9px;
+}
+
+.mil-table td.num,
+.mil-table th.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.mil-table thead th {
+    font-size: 0.58rem;
+    white-space: nowrap;
+}
+
+.mil-table tbody tr.row-fix td {
+    color: #ffd9d7;
+}
+
+.mil-table tbody tr.row-partial td {
+    color: #b9a88c;
+}
+
+/* ============================================================
+   PASSIVE INTERCEPT — plain-language summary
+   The row of numbers is the record. This is the part a player
+   can act on without doing trigonometry in their head.
+   ============================================================ */
+
+.passive-summary:empty {
+    display: none;
+}
+
+.passive-summary {
+    padding: 8px 9px;
+    border-bottom: 1px solid rgba(239, 83, 80, 0.25);
+    background: rgba(239, 83, 80, 0.06);
+}
+
+.ps-head {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-wrap: wrap;
+    margin-bottom: 5px;
+}
+
+.ps-brg,
+.ps-rng {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    color: #ffd9d7;
+}
+
+.ps-rng {
+    color: var(--mil-steel);
+    font-size: 0.68rem;
+}
+
+.ps-body {
+    font-family: var(--font-ui);
+    font-size: 0.74rem;
+    line-height: 1.45;
+    color: #c3cdd4;
+}
+
+.ps-body b {
+    font-family: var(--font-mono);
+    color: #ffd9d7;
+    letter-spacing: 0.06em;
+}
+
+/* Label on the search box drawn over enemy waters */
+.overlay-tag {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    fill: #ef5350;
+}
+
+@media (max-width: 900px) {
+    .game-sidebar {
+        width: 100%;
+        min-width: 0;
+        max-width: none;
+    }
+}
+
+/* --- v0.7.1b: column fit ------------------------------------
+   The RESULT column was being clipped off the right edge of the
+   panel. Slightly wider sidebar, tighter cells, shorter chips. */
+
+.game-sidebar {
+    width: 292px;
+    min-width: 292px;
+    max-width: 292px;
+}
+
+.mil-table {
+    font-size: 0.63rem;
+}
+
+.mil-table thead th,
+.mil-table tbody td {
+    padding: 4px 5px;
+}
+
+.mil-table tbody td:last-child,
+.mil-table thead th:last-child {
+    padding-right: 8px;
+}
+
+.mil-chip {
+    padding: 0 4px;
+    font-size: 0.56rem;
+    letter-spacing: 0.08em;
+}
+
+.mil-conf {
+    min-width: 34px;
+    padding: 0 3px;
+}
+
+.ps-body {
+    font-size: 0.72rem;
+    line-height: 1.4;
+}
+
+@media (max-width: 900px) {
+    .game-sidebar {
+        width: 100%;
+        min-width: 0;
+        max-width: none;
+    }
+}

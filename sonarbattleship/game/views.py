@@ -28,6 +28,7 @@ from game.game_logic import (
     check_overlap,
     angular_sonar,
     dsp_sonar,
+    counter_detect,
     process_fire,
     check_win,
 )
@@ -38,6 +39,55 @@ from game.signal_engine import (
     generate_idle_signals,
 )
 from game.signal_processor import process_signal
+
+
+# ============================================================
+# Visibility helpers
+# ============================================================
+
+# Fields of an Action.result that belong to the OPPONENT of the player
+# who took the action, and must never be served back to the actor.
+#
+# 'counter_detection' is the opponent's passive-sonar report: how well
+# their hydrophones heard this ping and where they think it came from.
+# Handing that to the player who pinged would tell them how far away the
+# enemy fleet is — the exact information they just paid a turn trying to
+# get, for free, and from the wrong side of the board.
+PRIVATE_RESULT_FIELDS = ('counter_detection',)
+
+
+def strip_private_action_fields(result):
+    """Return a copy of an action result safe to show to its own author."""
+    if not isinstance(result, dict):
+        return result
+    if not any(k in result for k in PRIVATE_RESULT_FIELDS):
+        return result
+    return {k: v for k, v in result.items() if k not in PRIVATE_RESULT_FIELDS}
+
+
+def redact_enemy_action_result(action_type, result):
+    """
+    Cut an opponent's action down to what we are entitled to know.
+
+    A sonar action's stored result is mostly the *attacker's* private
+    business: which of their own cells they transmitted from, what their
+    detector made of the return, how confident it was. Handing all of
+    that to the player being pinged would give away the attacker's exact
+    position for free — which is both wrong and would make passive
+    counter-detection pointless, since the answer it works so hard to
+    estimate would already be sitting in the same payload.
+
+    So for a sonar action we keep exactly one thing: the counter-detection
+    report, which is what OUR hydrophones heard and is ours by right.
+
+    Fire actions are different — the bomb landed on our grid, we can see
+    the splash, and hit/sunk is information we already have.
+    """
+    if not isinstance(result, dict):
+        return result
+    if action_type != 'sonar':
+        return result
+    return {'counter_detection': result.get('counter_detection')}
 
 
 # ============================================================
@@ -190,7 +240,8 @@ def api_room_state(request, room_code):
     for a in Action.objects.filter(room=room, player=me).order_by('-created_at')[:20]:
         action_data = {
             'type': a.action_type,
-            'result': a.result,
+            # My own sonar: I never learn whether the enemy heard me.
+            'result': strip_private_action_fields(a.result),
         }
         if a.action_type == 'sonar':
             # bearing stored in target_col, origin in result
@@ -207,14 +258,14 @@ def api_room_state(request, room_code):
         for a in Action.objects.filter(room=room, player=enemy).order_by('-created_at')[:20]:
             action_data = {
                 'type': a.action_type,
-                'result': a.result,
+                'result': redact_enemy_action_result(a.action_type, a.result),
             }
-            if a.action_type == 'sonar':
-                action_data['bearing'] = a.target_col
-                if a.result and 'origin' in a.result:
-                    action_data['origin'] = a.result['origin']
-            else:
+            if a.action_type != 'sonar':
                 action_data['target'] = [a.target_row, a.target_col]
+            # Deliberately no 'origin' and no 'bearing' for enemy sonar:
+            # where they transmitted from, and along which bearing, is
+            # exactly what our hydrophones are supposed to have to work
+            # out for themselves.
             enemy_actions.append(action_data)
 
     my_position = get_player_position(room, me)
@@ -385,6 +436,18 @@ def api_action(request, room_code):
         my_position = get_player_position(room, me)
 
         result = dsp_sonar(origin_row, origin_col, angle, enemy, me, room.grid_size, my_position)
+
+        # Active sonar gives away the boat that used it. Work out what the
+        # opponent's hydrophones make of the transmission and file it with
+        # the action — strip_private_action_fields() below keeps it out of
+        # the pinging player's own view, because a real submarine has no
+        # way of knowing whether anyone was listening.
+        enemy_position = get_player_position(room, enemy)
+        result['counter_detection'] = counter_detect(
+            [origin_row, origin_col], angle, enemy,
+            room.grid_size, enemy_position,
+        )
+
         Action.objects.create(
             room=room, player=me, action_type='sonar',
             target_row=origin_row, target_col=int(angle),
@@ -402,13 +465,17 @@ def api_action(request, room_code):
             result=result,
         )
 
+    # The immediate response goes to the player who just acted, so the
+    # opponent's passive-sonar report is stripped here too.
+    public_result = strip_private_action_fields(result)
+
     # Check win condition
     if action_type == 'fire' and result.get('hit') and check_win(enemy):
         room.status = 'finished'
         room.winner = me
         room.save()
         return JsonResponse({
-            'result': result,
+            'result': public_result,
             'game_over': True,
             'winner': me.name,
         })
@@ -418,7 +485,7 @@ def api_action(request, room_code):
     room.save()
 
     return JsonResponse({
-        'result': result,
+        'result': public_result,
         'game_over': False,
     })
 
@@ -489,11 +556,19 @@ def api_signals(request, room_code):
                     room.grid_size, my_position
                 )
             else:
-                # I fired a bomb — my ships hear the explosion's shockwave
-                event_type = 'bomb_shockwave'
+                # I fired a bomb — my ships hear the explosion, and if it
+                # struck a hull they hear that break up too. The two are
+                # deliberately different waveforms so the detector can
+                # tell a hit from a miss without being told.
+                fire_result = latest_action.result or {}
+                was_hit = bool(fire_result.get('hit'))
+                event_type = 'bomb_hit' if was_hit else 'bomb_miss'
                 signals = generate_bomb_shockwave_signals(
                     (latest_action.target_row, latest_action.target_col),
-                    my_ships, room.grid_size, my_position
+                    my_ships, room.grid_size, my_position,
+                    target_side='enemy',          # I aimed at their grid
+                    hit=was_hit,
+                    hit_ship_size=fire_result.get('ship_size'),
                 )
         else:
             # enemy did something
@@ -509,11 +584,19 @@ def api_signals(request, room_code):
                     my_ships, room.grid_size, my_position
                 )
             elif latest_action.action_type == 'fire':
-                # enemy bomb -> shockwave
-                event_type = 'bomb_shockwave'
+                # Enemy bomb — it landed on MY grid, so the blast is in my
+                # own coordinate frame. Passing target_side='mine' is what
+                # stops the defender's hydrophones computing the range as
+                # if the explosion were a whole grid away.
+                fire_result = latest_action.result or {}
+                was_hit = bool(fire_result.get('hit'))
+                event_type = 'bomb_hit' if was_hit else 'bomb_miss'
                 signals = generate_bomb_shockwave_signals(
                     (latest_action.target_row, latest_action.target_col),
-                    my_ships, room.grid_size, my_position
+                    my_ships, room.grid_size, my_position,
+                    target_side='mine',
+                    hit=was_hit,
+                    hit_ship_size=fire_result.get('ship_size'),
                 )
     else:
         # nothing new, just ocean noise
@@ -523,16 +606,33 @@ def api_signals(request, room_code):
     processed_signals = {}
     for ship_idx, sig_data in signals.items():
         processed = process_signal(sig_data['signal'])
+
+        # An enemy ping sweeping past us is a DIRECT arrival, not an echo
+        # off something — so the one-way reading is the correct one. The
+        # detector hands back both hypotheses precisely so the caller,
+        # which knows what kind of event this was, can choose.
+        distance = processed['estimated_distance']
+        if event_type == 'incoming_sonar':
+            distance = processed['estimated_distance_direct']
+
         processed_signals[ship_idx] = {
             'raw_signal': processed['raw_signal'],
             'noise_component': processed['noise_component'],
             'detected_signal': processed['detected_signal'],
             'detected': processed['detected'],
             'signal_type': processed['signal_type'],
+            'signal_class': processed['signal_class'],
             'confidence': processed['confidence'],
-            'estimated_distance': processed['estimated_distance'],
+            'snr': processed['snr'],
+            'estimated_distance': distance,
+            'estimated_size': processed['estimated_size'],
+            'hull_ring': processed['hull_ring'],
             'peak_sample_index': processed['peak_sample_index'],
             'has_echo': processed['detected'],
+            # what the physics engine actually did, so the sonar ping
+            # that bounced off our own hull can be labelled as such
+            'blocked': bool(sig_data.get('blocked')),
+            'blocked_by_size': sig_data.get('blocked_by_size'),
         }
 
     return JsonResponse({
