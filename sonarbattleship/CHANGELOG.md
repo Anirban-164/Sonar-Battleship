@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.2] — 2026-09-12
+
+### Changed
+- **Type Scale Raised**: everything in the console was set too small to read at a glance. Bumped roughly one step across the board — contact tables 0.63 → 0.76rem, panel titles 0.66 → 0.8rem, status chips 0.56 → 0.66rem, the bearing and origin readouts to 1.15rem, the passive-intercept summary to 0.88rem, and the oscilloscope's labels and detection readouts to match. Grid coordinate headers, fleet labels and the status badge went up too. Cell padding grew with the text so the tables keep their spacing.
+- **Sidebar Widened To Match**: 292 → 336px, so the larger text still fits its columns instead of clipping the RESULT column again.
+- **Bearing Dial Enlarged**: the ring is now 208px and its `viewBox` padded to `-122 -122 244 244`. At 13px the three-digit degree labels overran the old bounds and were sliced — the same clipping as before, reintroduced by the bigger type. The viewBox has to stay square and centred on (0,0), because the click handler maps the element's centre to bearing 000.
+- Stylesheet cache buster bumped to `?v=0.7.2`.
+
 ## [0.7.1] — 2026-09-12
 
 ### Fixed
