@@ -69,42 +69,60 @@
             <!-- Sidebar: sonar controls, fire hint, action result, sonar log -->
             <div class="game-sidebar">
                 <!-- Sonar controls -->
-                <div id="sonar-controls" class="sonar-controls">
-                    <div class="angle-picker-wrapper">
-                        <svg id="angle-picker" width="180" height="180" viewBox="-100 -100 200 200" style="cursor:crosshair;">
-                            <circle cx="0" cy="0" r="90" fill="rgba(13,17,23,0.8)" stroke="#2a3040" stroke-width="2"/>
-                            <!-- Major tick marks -->
-                            <line x1="0" y1="-88" x2="0" y2="-76" stroke="#546e7a" stroke-width="1.5"/>
-                            <line x1="88" y1="0" x2="76" y2="0" stroke="#546e7a" stroke-width="1.5"/>
-                            <line x1="0" y1="88" x2="0" y2="76" stroke="#546e7a" stroke-width="1.5"/>
-                            <line x1="-88" y1="0" x2="-76" y2="0" stroke="#546e7a" stroke-width="1.5"/>
-                            <!-- 45° tick marks -->
-                            <line x1="62" y1="-62" x2="54" y2="-54" stroke="#37474f" stroke-width="1"/>
-                            <line x1="62" y1="62" x2="54" y2="54" stroke="#37474f" stroke-width="1"/>
-                            <line x1="-62" y1="62" x2="-54" y2="54" stroke="#37474f" stroke-width="1"/>
-                            <line x1="-62" y1="-62" x2="-54" y2="-54" stroke="#37474f" stroke-width="1"/>
-                            <!-- Labels -->
-                            <text x="0" y="-92" text-anchor="middle" fill="#78909c" font-size="11" font-family="monospace">0°</text>
-                            <text x="96" y="4" text-anchor="start" fill="#78909c" font-size="11" font-family="monospace">90°</text>
-                            <text x="0" y="100" text-anchor="middle" fill="#78909c" font-size="11" font-family="monospace">180°</text>
-                            <text x="-96" y="4" text-anchor="end" fill="#78909c" font-size="11" font-family="monospace">270°</text>
+                <div id="sonar-controls" class="sonar-controls mil-panel">
+                    <div class="mil-panel-header">
+                        <span class="mil-panel-title">Bearing Selector</span>
+                        <span class="mil-panel-meta" id="bearing-readout">000°</span>
+                    </div>
+                    <div class="sonar-console">
+                        <!-- viewBox is padded past the r=90 ring so the outer
+                             degree labels are not clipped by its edge, which
+                             is what was chopping "90°" and "270°" in half. -->
+                        <svg id="angle-picker" viewBox="-112 -112 224 224" style="cursor:crosshair;">
+                            <circle cx="0" cy="0" r="90" fill="rgba(6,10,16,0.82)" stroke="#22303d" stroke-width="2"/>
+                            <circle cx="0" cy="0" r="62" fill="none" stroke="#182531" stroke-width="1"/>
+                            <circle cx="0" cy="0" r="32" fill="none" stroke="#182531" stroke-width="1"/>
+
+                            <!-- Tick ring: every 15°, longer every 45°, longest on the cardinals -->
+                            <g id="dial-ticks" stroke="#48626f"></g>
+
+                            <!-- Degree labels only. Cardinal letters sat right
+                                 on top of these at this size and just made the
+                                 dial look busy — the numbers are what the
+                                 player types anyway. -->
+                            <text x="0" y="-97" text-anchor="middle" class="dial-deg">000</text>
+                            <text x="103" y="4" text-anchor="middle" class="dial-deg">090</text>
+                            <text x="0" y="107" text-anchor="middle" class="dial-deg">180</text>
+                            <text x="-103" y="4" text-anchor="middle" class="dial-deg">270</text>
+
                             <!-- Beam wedge (filled by JS) -->
-                            <path id="beam-wedge" d="" fill="rgba(79,195,247,0.08)" stroke="none"/>
+                            <path id="beam-wedge" d="" fill="rgba(79,195,247,0.10)" stroke="none"/>
                             <!-- Bearing line -->
                             <line id="bearing-line" x1="0" y1="0" x2="0" y2="-80" stroke="#4fc3f7" stroke-width="3" stroke-linecap="round"/>
-                            <!-- Center dot -->
                             <circle cx="0" cy="0" r="4" fill="#4fc3f7"/>
                         </svg>
-                        <div class="angle-readout">
-                            <input type="number" id="angle-input" min="0" max="359" value="0" onchange="setAngleFromInput()"/>
-                            <span class="angle-deg">°</span>
+
+                        <div class="console-row">
+                            <span class="console-key">BRG</span>
+                            <input type="number" id="angle-input" min="0" max="359" value="0"
+                                   onchange="setAngleFromInput()" class="console-input"/>
+                            <span class="console-unit">°</span>
+                        </div>
+
+                        <div class="console-row" id="sonar-origin-hint">
+                            <span class="console-key">ORG</span>
+                            <span id="sonar-origin-display" class="sonar-origin-display">SELECT HULL CELL</span>
+                        </div>
+
+                        <button id="btn-ping" onclick="fireSonar()" class="ping-btn" disabled>📡 Transmit Ping</button>
+
+                        <!-- The transmitting player is never told whether they
+                             were heard, so this caution is permanent rather
+                             than a per-ping result. -->
+                        <div class="emcon-warning">
+                            <strong>EMCON</strong> Transmitting discloses this hull's bearing and range to hostile hydrophones.
                         </div>
                     </div>
-                    <div id="sonar-origin-hint" class="sonar-origin-hint">
-                        <p>📡 Select an <strong>undamaged ship cell</strong> on your grid, then choose a bearing</p>
-                        <p id="sonar-origin-display" class="sonar-origin-display" style="display:none;"></p>
-                    </div>
-                    <button id="btn-ping" onclick="fireSonar()" class="ping-btn" disabled>📡 Ping Sonar</button>
                 </div>
 
                 <!-- Fire hint (shown when fire mode selected) -->
@@ -115,10 +133,58 @@
                 <!-- Action result -->
                 <div id="action-result" class="result-panel" style="display:none;"></div>
 
-                <!-- Sonar log -->
+                <!-- Contact log + passive counter-detection board -->
                 <div id="sonar-log" class="sonar-log">
-                    <h4>Sonar Readings</h4>
-                    <ul id="sonar-readings"></ul>
+
+                    <!-- ACTIVE: what our own pings brought back -->
+                    <div class="mil-panel">
+                        <div class="mil-panel-header">
+                            <span class="mil-panel-title">Active Sonar Log</span>
+                            <span class="mil-panel-meta" id="sonar-log-count">00 REC</span>
+                        </div>
+                        <div class="mil-table-wrap">
+                            <table class="mil-table" id="sonar-table">
+                                <thead>
+                                    <tr>
+                                        <th title="Cell we transmitted from">FROM</th>
+                                        <th title="Bearing we swept, degrees">BRG</th>
+                                        <th class="num" title="Estimated range to contact, in cells">RANGE</th>
+                                        <th class="num" title="Estimated hull length of the contact, in cells">HULL</th>
+                                        <th class="num" title="Detector confidence, percent">CONF</th>
+                                        <th title="What the detector concluded">RESULT</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sonar-readings"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- PASSIVE: hostile transmissions our hydrophones picked up -->
+                    <div class="mil-panel passive-panel" id="passive-panel">
+                        <div class="mil-panel-header">
+                            <span class="mil-panel-title">Passive Intercept</span>
+                            <span class="mil-panel-meta" id="passive-log-count">00 REC</span>
+                        </div>
+
+                        <!-- The newest intercept, spelled out. The table below
+                             is the record; this is the thing to act on. -->
+                        <div id="passive-summary" class="passive-summary"></div>
+
+                        <div class="mil-table-wrap">
+                            <table class="mil-table" id="passive-table">
+                                <thead>
+                                    <tr>
+                                        <th title="Our hull that heard it best">HEARD BY</th>
+                                        <th title="Bearing to the transmitter, degrees">BRG</th>
+                                        <th class="num" title="Range to the transmitter, in cells">RANGE</th>
+                                        <th class="num" title="How many of our hulls heard it — two or more are needed for a bearing">HULLS</th>
+                                        <th class="num" title="Detector confidence, percent">CONF</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="passive-readings"></tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -130,6 +196,10 @@
                 </div>
                 <div class="grid-overlay-container">
                     <div id="combined-grid" class="combined-grid"></div>
+                    <!-- Where the last hostile transmission came from. Drawn
+                         on its own layer so it survives the beam overlay
+                         being cleared when we leave sonar mode. -->
+                    <svg id="passive-contact-overlay" xmlns="http://www.w3.org/2000/svg"></svg>
                     <svg id="sonar-beam-overlay" xmlns="http://www.w3.org/2000/svg"></svg>
                 </div>
             </div>
@@ -565,7 +635,9 @@
         updateShipStatus('my-ships-status', gameState.my_ships, true);
         updateShipStatus('enemy-ships-status', gameState.enemy_ships, false);
         updateSonarLog();
+        updatePassiveLog();
         updateBeamOverlay();
+        updatePassiveOverlay();
         checkForNewEnemyExplosions();
         initSignalPanel(); // week 3: build oscilloscope canvases if not built yet
     }
@@ -814,8 +886,8 @@
         // Update origin display
         const cellName = `${String.fromCharCode(65 + row)}${col}`;
         const originDisplay = document.getElementById('sonar-origin-display');
-        originDisplay.textContent = `Origin: ${cellName}`;
-        originDisplay.style.display = 'block';
+        originDisplay.textContent = cellName;
+        originDisplay.classList.add('is-set');
 
         // Refresh grid and beam overlay
         updateCombinedGrid();
@@ -856,7 +928,8 @@
             sonarOrigin = null;
             document.getElementById('btn-ping').disabled = true;
             const originDisplay = document.getElementById('sonar-origin-display');
-            originDisplay.style.display = 'none';
+            originDisplay.textContent = 'SELECT HULL CELL';
+            originDisplay.classList.remove('is-set');
             clearBeamOverlay();
         } else {
             // Re-check if origin is still valid, otherwise disable ping
@@ -875,8 +948,30 @@
     // ============================================================
     let anglePickerInit = false;
 
+    // Draw the dial's tick ring once: every 15 degrees, longer on the
+    // 45s, longest on the cardinals. Done in JS rather than by hand in
+    // the markup so the spacing stays exact.
+    function buildDialTicks() {
+        const g = document.getElementById('dial-ticks');
+        if (!g || g.childNodes.length) return;
+        let svg = '';
+        for (let deg = 0; deg < 360; deg += 15) {
+            const major = deg % 90 === 0;
+            const mid = deg % 45 === 0;
+            const len = major ? 14 : (mid ? 10 : 6);
+            const w = major ? 2 : 1;
+            const rad = deg * Math.PI / 180;
+            const r1 = 90, r2 = 90 - len;
+            svg += `<line x1="${(r1 * Math.sin(rad)).toFixed(2)}" y1="${(-r1 * Math.cos(rad)).toFixed(2)}"
+                          x2="${(r2 * Math.sin(rad)).toFixed(2)}" y2="${(-r2 * Math.cos(rad)).toFixed(2)}"
+                          stroke-width="${w}" opacity="${major ? 0.95 : (mid ? 0.7 : 0.4)}"/>`;
+        }
+        g.innerHTML = svg;
+    }
+
     function initAnglePicker() {
         if (anglePickerInit) return;
+        buildDialTicks();
         const svg = document.getElementById('angle-picker');
 
         svg.addEventListener('click', (e) => {
@@ -934,8 +1029,10 @@
         const wy2 = -r * Math.cos(rad2);
         wedge.setAttribute('d', `M 0 0 L ${wx1} ${wy1} A ${r} ${r} 0 0 1 ${wx2} ${wy2} Z`);
 
-        // Update input
+        // Update input and the header readout
         document.getElementById('angle-input').value = currentAngle;
+        const brgOut = document.getElementById('bearing-readout');
+        if (brgOut) brgOut.textContent = String(currentAngle).padStart(3, '0') + '°';
 
         // Update beam overlay on the grid
         updateBeamOverlay();
@@ -981,7 +1078,8 @@
             sonarOrigin = null;
             document.getElementById('btn-ping').disabled = true;
             const originDisplay = document.getElementById('sonar-origin-display');
-            originDisplay.style.display = 'none';
+            originDisplay.textContent = 'SELECT HULL CELL';
+            originDisplay.classList.remove('is-set');
             clearBeamOverlay();
 
             pollState();
@@ -1083,10 +1181,16 @@
             }
         } else {
             const originLabel = (row >= 0 && col >= 0) ? `${String.fromCharCode(65 + row)}${col}` : '?';
-            if (result.contact) {
-                panel.innerHTML = `<div class="result-sonar">📡 From ${originLabel} → ${result.bearing}° — Contact ~${result.distance} cells away</div>`;
+            if (result.blocked) {
+                const sz = result.blocked_by_size ? ` SUB-${result.blocked_by_size}` : '';
+                panel.innerHTML = `<div class="result-sonar">🚫 From ${originLabel} → ${result.bearing}° — Blocked by your own${sz} at ~${result.blocker_distance} cells. Turn wasted.</div>`;
+            } else if (result.contact) {
+                const sizeTxt = result.estimated_size ? `, size ≈ ${result.estimated_size}` : '';
+                const confTxt = result.confidence != null ? ` (conf ${formatConfidence(result.confidence)})` : '';
+                panel.innerHTML = `<div class="result-sonar">📡 From ${originLabel} → ${result.bearing}° — Contact ~${result.distance} cells away${sizeTxt}${confTxt}</div>`;
             } else {
-                panel.innerHTML = `<div class="result-sonar">📡 From ${originLabel} → ${result.bearing}° — No contact</div>`;
+                const confTxt = result.confidence != null ? ` (conf ${formatConfidence(result.confidence)})` : '';
+                panel.innerHTML = `<div class="result-sonar">📡 From ${originLabel} → ${result.bearing}° — No contact${confTxt}</div>`;
             }
         }
 
@@ -1096,25 +1200,179 @@
     // ============================================================
     // Sonar Log
     // ============================================================
+    function cellLabel(rc) {
+        if (!rc) return '--';
+        return `${String.fromCharCode(65 + rc[0])}${rc[1]}`;
+    }
+
+    function brgLabel(deg) {
+        if (deg == null) return '---';
+        return String(Math.round(deg)).padStart(3, '0') + '°';
+    }
+
+    function confCell(conf) {
+        const c = Math.max(0, Math.min(1, Number(conf) || 0));
+        const pct = (c * 100).toFixed(0);
+        return `<span class="mil-conf" style="--conf:${pct}%"><span>${pct}</span></span>`;
+    }
+
+    function emptyRow(cols, text) {
+        return `<tr class="mil-empty"><td colspan="${cols}">${text}</td></tr>`;
+    }
+
+    // ---- ACTIVE: results of our own pings ----
     function updateSonarLog() {
-        const list = document.getElementById('sonar-readings');
-        if (!gameState.my_actions) return;
+        const body = document.getElementById('sonar-readings');
+        const count = document.getElementById('sonar-log-count');
+        if (!body || !gameState.my_actions) return;
 
         const sonarActions = gameState.my_actions.filter(a => a.type === 'sonar');
-        list.innerHTML = sonarActions.map(a => {
-            const bearing = a.bearing !== undefined ? a.bearing : '?';
-            let originLabel = '?';
-            if (a.origin) {
-                originLabel = `${String.fromCharCode(65 + a.origin[0])}${a.origin[1]}`;
-            } else if (a.result && a.result.origin) {
-                originLabel = `${String.fromCharCode(65 + a.result.origin[0])}${a.result.origin[1]}`;
-            }
-            if (a.result && a.result.contact) {
-                return `<li class="sonar-contact">📡 ${originLabel} → ${bearing}° → ~${a.result.distance} cells</li>`;
+        if (count) {
+            count.textContent = String(sonarActions.length).padStart(2, '0') + ' REC';
+        }
+
+        if (!sonarActions.length) {
+            body.innerHTML = emptyRow(6, 'NO ACTIVE TRANSMISSIONS');
+            return;
+        }
+
+        body.innerHTML = sonarActions.map(a => {
+            const r = a.result || {};
+            const bearing = brgLabel(a.bearing !== undefined ? a.bearing : r.bearing);
+            const origin = cellLabel(a.origin || r.origin);
+
+            // Chip text stays short — the detail goes in the tooltip.
+            // A long chip pushed the whole column past the panel edge.
+            let status, rng, size;
+            if (r.blocked) {
+                const by = r.blocked_by_size ? `SUB-${r.blocked_by_size}` : 'own hull';
+                const at = r.blocker_distance != null ? ` at ${r.blocker_distance} cells` : '';
+                status = `<span class="mil-chip blocked" title="Beam blocked by ${by}${at} — no enemy data">BLOCKED</span>`;
+                rng = '—';
+                size = '—';
+            } else if (r.contact) {
+                status = `<span class="mil-chip ok" title="Echo returned from an enemy hull">CONTACT</span>`;
+                rng = (r.distance != null ? r.distance.toFixed(1) : '—');
+                size = (r.estimated_size != null ? r.estimated_size : '—');
             } else {
-                return `<li class="sonar-empty">📡 ${originLabel} → ${bearing}° → No contact</li>`;
+                status = `<span class="mil-chip none" title="Nothing in the beam cleared the detection threshold">EMPTY</span>`;
+                rng = '—';
+                size = '—';
             }
+
+            return `<tr>
+                <td>${origin}</td>
+                <td>${bearing}</td>
+                <td class="num">${rng}</td>
+                <td class="num">${size}</td>
+                <td class="num">${confCell(r.confidence)}</td>
+                <td>${status}</td>
+            </tr>`;
         }).join('');
+    }
+
+    // ---- PASSIVE: hostile transmissions our hydrophones picked up ----
+    //
+    // The backend attaches a counter-detection report to the ENEMY's sonar
+    // actions and strips it from the pinging player's own copy, so this
+    // reads exclusively from enemy_actions. There is no equivalent panel
+    // for our own pings — we are never told whether we were heard.
+    let lastPassiveCount = 0;
+    let latestPassiveFix = null;
+
+    const COMPASS_POINTS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+                            'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+
+    function compassPoint(deg) {
+        if (deg == null) return '';
+        return COMPASS_POINTS[Math.round(((deg % 360) + 360) % 360 / 22.5) % 16];
+    }
+
+    // The table is the record; this is the line that tells you what to do
+    // about it. Without it a row like "H13 045 2.8 2 67" is a pile of
+    // numbers the player has to convert into a place on the board in
+    // their head.
+    function renderPassiveSummary(cd) {
+        const el = document.getElementById('passive-summary');
+        if (!el) return;
+        if (!cd) { el.innerHTML = ''; return; }
+
+        const heardBy = cellLabel(cd.listener_cell);
+
+        if (cd.fix_quality !== 'fix') {
+            el.innerHTML = `
+                <div class="ps-head"><span class="mil-chip blocked">RANGE ONLY</span></div>
+                <div class="ps-body">
+                    Hostile ping heard by <b>${heardBy}</b> at
+                    <b>${cd.range != null ? cd.range.toFixed(1) : '?'}</b> cells.
+                    Only one hull heard it, so there is no bearing — the
+                    transmitter is somewhere on that circle.
+                </div>`;
+            return;
+        }
+
+        const area = cd.fix_cell
+            ? `${cellLabel(cd.fix_cell)} ±${cd.fix_radius || 1}`
+            : null;
+
+        el.innerHTML = `
+            <div class="ps-head">
+                <span class="mil-chip alert">FIX</span>
+                <span class="ps-brg">${brgLabel(cd.bearing)} ${compassPoint(cd.bearing)}</span>
+                <span class="ps-rng">${cd.range.toFixed(1)} cells</span>
+            </div>
+            <div class="ps-body">
+                Hostile ping from <b>${heardBy}</b>, ${cd.hydrophones} hulls triangulating.
+                ${area ? `Estimated position <b>${area}</b> on enemy waters.` : ''}
+            </div>`;
+    }
+
+    function updatePassiveLog() {
+        const body = document.getElementById('passive-readings');
+        const count = document.getElementById('passive-log-count');
+        const panel = document.getElementById('passive-panel');
+        if (!body) return;
+
+        const hits = (gameState.enemy_actions || [])
+            .filter(a => a.type === 'sonar' && a.result && a.result.counter_detection)
+            .map(a => a.result.counter_detection)
+            .filter(cd => cd.detected);
+
+        if (count) {
+            count.textContent = String(hits.length).padStart(2, '0') + ' REC';
+        }
+
+        // enemy_actions arrive newest-first, so index 0 is the freshest.
+        latestPassiveFix = hits.length ? hits[0] : null;
+
+        if (!hits.length) {
+            body.innerHTML = emptyRow(5, 'NO HOSTILE EMISSIONS DETECTED');
+            const sum = document.getElementById('passive-summary');
+            if (sum) sum.innerHTML = '';
+            lastPassiveCount = 0;
+            return;
+        }
+
+        body.innerHTML = hits.map(cd => {
+            const fixed = cd.fix_quality === 'fix';
+            return `<tr class="${fixed ? 'row-fix' : 'row-partial'}">
+                <td>${cellLabel(cd.listener_cell)}</td>
+                <td>${fixed ? brgLabel(cd.bearing) : '—'}</td>
+                <td class="num">${cd.range != null ? cd.range.toFixed(1) : '—'}</td>
+                <td class="num">${cd.hydrophones || 0}</td>
+                <td class="num">${confCell(cd.confidence)}</td>
+            </tr>`;
+        }).join('');
+
+        renderPassiveSummary(hits[0]);
+
+        // Flash the panel when a new hostile transmission comes in.
+        if (panel && hits.length > lastPassiveCount) {
+            panel.classList.remove('alerting');
+            void panel.offsetWidth;      // restart the animation
+            panel.classList.add('alerting');
+        }
+        lastPassiveCount = hits.length;
     }
 
     // ============================================================
@@ -1232,6 +1490,118 @@
     }
 
     // ============================================================
+    // Passive Contact Overlay
+    // Draws the last hostile transmission we heard: a range arc
+    // centred on the hydrophone that heard it, plus a bearing ray
+    // when several boats managed a fix between them.
+    // ============================================================
+    function updatePassiveOverlay() {
+        const overlay = document.getElementById('passive-contact-overlay');
+        if (!overlay) return;
+
+        const fix = latestPassiveFix;
+        if (!fix || !fix.detected || !fix.listener_cell) {
+            overlay.innerHTML = '';
+            return;
+        }
+
+        const grid = document.getElementById('combined-grid');
+        if (!grid) return;
+
+        const listenerCell = document.getElementById(
+            `${myPosition}-${fix.listener_cell[0]}-${fix.listener_cell[1]}`
+        );
+        if (!listenerCell) { overlay.innerHTML = ''; return; }
+
+        const gridRect = grid.getBoundingClientRect();
+        const cellRect = listenerCell.getBoundingClientRect();
+        if (!cellRect.width) { overlay.innerHTML = ''; return; }
+
+        const ox = cellRect.left - gridRect.left + cellRect.width / 2;
+        const oy = cellRect.top - gridRect.top + cellRect.height / 2;
+
+        const w = gridRect.width;
+        const h = gridRect.height;
+        overlay.setAttribute('width', w);
+        overlay.setAttribute('height', h);
+        overlay.setAttribute('viewBox', `0 0 ${w} ${h}`);
+        overlay.style.width = w + 'px';
+        overlay.style.height = h + 'px';
+
+        // One grid step in pixels, so a range in cells becomes a radius.
+        const step = cellRect.width + 2;
+        const radius = Math.max(0, (fix.range || 0)) * step;
+        const hasFix = fix.fix_quality === 'fix' && fix.bearing != null;
+
+        let markup = `
+            <circle cx="${ox}" cy="${oy}" r="5" fill="#ef5350" opacity="0.85"/>
+            <circle cx="${ox}" cy="${oy}" r="9" fill="none" stroke="#ef5350"
+                    stroke-width="1.5" opacity="0.5">
+                <animate attributeName="r" values="9;18;9" dur="2.4s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.5;0;0.5" dur="2.4s" repeatCount="indefinite"/>
+            </circle>`;
+
+        // The range circle is only drawn when the range is ALL we have.
+        // Once several hulls have fixed a bearing, a full circle sweeping
+        // across the whole board adds no information and buries the
+        // search area under it.
+        if (!hasFix) {
+            markup += `
+                <circle cx="${ox}" cy="${oy}" r="${radius}"
+                        fill="none" stroke="rgba(239,83,80,0.45)" stroke-width="1.5"
+                        stroke-dasharray="6,6"/>`;
+        }
+
+        // With a bearing we can point at the transmitter, not just ring it.
+        if (hasFix) {
+            const rad = fix.bearing * Math.PI / 180;
+            const tx = ox + radius * Math.sin(rad);
+            const ty = oy - radius * Math.cos(rad);
+            markup += `
+                <line x1="${ox}" y1="${oy}" x2="${tx}" y2="${ty}"
+                      stroke="rgba(239,83,80,0.75)" stroke-width="2"
+                      stroke-dasharray="9,5" stroke-linecap="round"/>`;
+
+            // The fix itself, drawn as the search area it actually is. A
+            // crosshair on one cell would claim far more precision than
+            // multilateration on noisy arrival times can support.
+            const box = searchAreaRect(fix.fix_cell, fix.fix_radius || 1, gridRect);
+            if (box) {
+                markup += `
+                    <rect x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}"
+                          fill="rgba(239,83,80,0.10)" stroke="#ef5350" stroke-width="2"
+                          stroke-dasharray="7,4" rx="3"/>
+                    <text x="${box.x + box.w / 2}" y="${box.y - 6}" text-anchor="middle"
+                          class="overlay-tag">EST CONTACT ±${fix.fix_radius || 1}</text>`;
+            }
+        }
+
+        overlay.innerHTML = markup;
+    }
+
+    // Pixel rect covering fix_cell +/- radius on the ENEMY half of the
+    // combined grid, clamped to the board.
+    function searchAreaRect(cell, radius, gridRect) {
+        if (!cell) return null;
+        const enemySide = myPosition === 'left' ? 'right' : 'left';
+        const lo = (v) => Math.max(0, v - radius);
+        const hi = (v) => Math.min(GRID_SIZE - 1, v + radius);
+
+        const tl = document.getElementById(`${enemySide}-${lo(cell[0])}-${lo(cell[1])}`);
+        const br = document.getElementById(`${enemySide}-${hi(cell[0])}-${hi(cell[1])}`);
+        if (!tl || !br) return null;
+
+        const a = tl.getBoundingClientRect();
+        const b = br.getBoundingClientRect();
+        return {
+            x: a.left - gridRect.left,
+            y: a.top - gridRect.top,
+            w: (b.right - a.left),
+            h: (b.bottom - a.top),
+        };
+    }
+
+    // ============================================================
     // Signal Processing (Week 4)
     // 3-column grid: one per ship, each with raw/noise/detected canvases
     // ============================================================
@@ -1251,6 +1621,18 @@
         sonar_echo:      '#66bb6a',
         incoming_sonar:  '#ffb74d',
         bomb_shockwave:  '#ef5350',
+        bomb_hit:        '#ef5350',
+        bomb_miss:       '#90a4ae',
+    };
+
+    // How the detector's verdict gets spelled out for the player. The
+    // backend now separates a bomb that broke a hull from one that went
+    // into open water, so the readout has to say which.
+    const SIGNAL_TYPE_LABELS = {
+        sonar:     '🔊 Sonar echo',
+        bomb_hit:  '💥 Bomb — HULL HIT',
+        bomb_miss: '💦 Bomb — miss (open water)',
+        unknown:   '❔ Unclassified',
     };
 
     const LAYERS = [
@@ -1568,6 +1950,42 @@
         if (allUnpaused) startIdleAnimation();
     }
 
+    // Confidence arrives from the backend already normalised to 0..1
+    // (a logistic on the matched filter's signal-to-noise ratio). It used
+    // to be the raw correlation peak, which is unbounded — that is why
+    // the meter could read well over 100%. Clamp anyway, cheaply.
+    function formatConfidence(conf) {
+        const c = Math.max(0, Math.min(1, Number(conf) || 0));
+        return `${(c * 100).toFixed(0)}%`;
+    }
+
+    function formatDetectionReadout(sigData) {
+        // Our own ping bounced off a friendly hull — the beam never got
+        // out, so whatever the correlator found says nothing about the
+        // enemy. Say so plainly instead of reporting a bogus contact.
+        if (sigData.blocked) {
+            const sz = sigData.blocked_by_size ? ` (SUB-${sigData.blocked_by_size})` : '';
+            return `🚫 Beam blocked by friendly hull${sz} — no enemy data`;
+        }
+
+        if (!sigData.detected) {
+            return `No contact — confidence ${formatConfidence(sigData.confidence)}`;
+        }
+
+        const label = SIGNAL_TYPE_LABELS[sigData.signal_type] || '❔ Contact';
+        const parts = [label];
+
+        if (sigData.estimated_distance != null) {
+            parts.push(`D ≈ ${sigData.estimated_distance} cells`);
+        }
+        if (sigData.estimated_size != null) {
+            parts.push(`size ≈ ${sigData.estimated_size}`);
+        }
+        parts.push(`conf ${formatConfidence(sigData.confidence)}`);
+
+        return parts.join(' — ');
+    }
+
     // --- main signal poller ---
     async function pollSignals() {
         if (!gameState || gameState.status !== 'in_progress') return;
@@ -1590,8 +2008,16 @@
             if (eventType !== 'idle') {
                 stopIdleAnimation();
 
-                const tagLabels = { sonar_echo: 'ECHO', incoming_sonar: 'INCOMING', bomb_shockwave: 'SHOCKWAVE' };
-                const tagClasses = { sonar_echo: 'echo', incoming_sonar: 'incoming', bomb_shockwave: 'shockwave' };
+                const tagLabels = {
+                    sonar_echo: 'ECHO', incoming_sonar: 'INCOMING',
+                    bomb_shockwave: 'SHOCKWAVE',
+                    bomb_hit: 'HULL HIT', bomb_miss: 'SPLASH',
+                };
+                const tagClasses = {
+                    sonar_echo: 'echo', incoming_sonar: 'incoming',
+                    bomb_shockwave: 'shockwave',
+                    bomb_hit: 'shockwave', bomb_miss: 'shockwave',
+                };
 
                 Object.keys(signals).forEach(idxStr => {
                     const idx = parseInt(idxStr);
@@ -1600,7 +2026,11 @@
                     const sigData = signals[idxStr];
                     if (!sigData) return;
 
-                    const detColor = sigData.signal_type === 'bomb' ? '#ef5350' : '#66bb6a';
+                    // Colour the correlation trace by what the detector
+                    // decided, not by the raw event: a hit rings red, a
+                    // miss stays grey, a sonar return is green.
+                    const detColor = SIGNAL_COLORS[sigData.signal_type]
+                                     || (sigData.signal_class === 'bomb' ? '#ef5350' : '#66bb6a');
                     shipEventColors[idx] = detColor;
 
                     shipEventSignals[idx] = {
@@ -1628,17 +2058,13 @@
 
                             const readout = document.getElementById(`signal-readout-${idx}`);
                             if (readout) {
-                                if (sigData.detected) {
-                                    const typeLabel = sigData.signal_type === 'sonar' ? '🔊 Sonar' : '💥 Bomb';
-                                    readout.textContent = `${typeLabel} — D ≈ ${sigData.estimated_distance} cells (conf: ${(sigData.confidence * 100).toFixed(0)}%)`;
-                                    readout.classList.add('has-detection');
-                                } else {
-                                    readout.textContent = 'No contact detected';
-                                    readout.classList.remove('has-detection');
-                                }
+                                readout.textContent = formatDetectionReadout(sigData);
+                                readout.classList.toggle('has-detection', !!sigData.detected);
                             }
 
-                            if (sigData.detected && sigData.peak_sample_index) {
+                            // peak_sample_index can legitimately be 0, so
+                            // test for null rather than falsiness.
+                            if (sigData.detected && sigData.peak_sample_index != null) {
                                 drawPeakMarker(detCanvas, sigData.peak_sample_index, sigData.detected_signal, detColor);
                             }
 

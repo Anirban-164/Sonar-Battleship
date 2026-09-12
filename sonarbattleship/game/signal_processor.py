@@ -1,26 +1,66 @@
 import numpy as np
+
 from game.signal_engine import (
     SAMPLE_RATE, NUM_SAMPLES, SIGNAL_DURATION,
-    SONAR_FREQ, SONAR_SIGMA, BOMB_FREQ, BOMB_SIGMA,
-    NOISE_LEVEL, DELAY_PER_CELL,
-    time_axis, gaussian_ping,
+    SONAR_FREQ, SONAR_SIGMA, SONAR_AMPLITUDE,
+    BOMB_FREQ, BOMB_SIGMA, BOMB_AMPLITUDE,
+    HULL_FREQ, HULL_SIGMA, HULL_AMPLITUDE, HULL_RING_LAG,
+    NOISE_LEVEL, DELAY_PER_CELL, ATTENUATION_ALPHA,
+    REFERENCE_SHIP_SIZE, PULSE_ORIGIN_OFFSET,
+    time_axis, gaussian_ping, size_pulse_width,
 )
 
 # ----- Detection thresholds -----
-# Peak correlation value must exceed this to count as a detection.
-# NOISE_LEVEL=0.15 (AWGN sigma). Matched-filter output on pure noise
-# has a standard deviation of ~1/sqrt(N) ≈ 0.04 for N=600 samples,
-# but random spikes can easily hit 0.08. Setting the threshold at 0.30
-# gives a comfortable margin above the noise floor while still catching
-# real echoes (which typically peak at 0.4-0.9 after attenuation).
-DETECTION_THRESHOLD = 0.30
-CLASSIFICATION_MARGIN = 1.5  # Sonar band must have 1.5x more energy than bomb band --> otherwise consider it a stronger shockwave
+#
+# The old code compared the raw matched-filter peak against a fixed
+# number (0.30). That could never be right for long: the peak height
+# depends on how loud the echo was, which depends on distance and on the
+# size of the target, so a genuine contact from a small boat far away sat
+# below it while a close blast sat far above it. Worse, that same raw
+# peak was handed to the UI and multiplied by 100 to make a
+# "confidence %", which happily printed numbers well over 100%.
+#
+# What matters is how far the peak stands out of the noise around it. We
+# measure the noise floor from the correlation trace itself and work in a
+# signal-to-noise ratio, which is dimensionless and comparable across
+# every event in the game.
+SNR_DETECTION_THRESHOLD = 5.5   # peak must be this many times the noise floor
+CONFIDENCE_SLOPE = 0.55         # how sharply confidence saturates either side
+MIN_PEAK_ABSOLUTE = 0.02        # absolute floor, guards against silent input
+
+# Kept for anything still importing it; the SNR test above is what decides.
+DETECTION_THRESHOLD = MIN_PEAK_ABSOLUTE
+
+# Energy ratio a band needs before we believe it over its neighbour.
+CLASSIFICATION_MARGIN = 1.5
 
 
 # ----- Frequency bands for bandpass filtering -----
-# sonar pings live around SONAR_FREQ (5 Hz), bomb shockwaves around BOMB_FREQ (2 Hz)
-SONAR_BAND = (3.0, 8.0)   # Hz — pass frequencies in this range for sonar detection
-BOMB_BAND  = (0.5, 4.0)   # Hz — pass frequencies in this range for bomb detection
+# These no longer overlap. They used to (sonar 3-8, bomb 0.5-4), so a
+# single event showed up in both bands and the classifier was choosing
+# between two views of the same energy.
+#   bomb blast  ~2 Hz   (broad, low)
+#   sonar ping  ~5 Hz   (the transmitted pulse and its echo)
+#   hull ring  ~12 Hz   (only exists when a bomb breaks a hull)
+BOMB_BAND = (0.5, 3.0)
+SONAR_BAND = (3.0, 8.0)
+HULL_BAND = (8.0, 17.0)
+
+# Sonar template bank. We do not know how big the thing out there is, so
+# we correlate against one template per plausible submarine size and let
+# the best match tell us. This is the "use the size of the submarine to
+# work out what is on the path" part — a 5-cell boat returns a slightly
+# wider echo than a 3-cell boat.
+SONAR_SIZE_HYPOTHESES = (3, 4, 5)
+
+# Plausible range for a reported size estimate.
+MIN_REPORTED_SIZE = 2
+MAX_REPORTED_SIZE = 6
+
+# Nothing can come back before it was sent. Restricting the peak search
+# to non-negative delays removes half the opportunities for noise to
+# masquerade as a contact, and is simply true.
+_MIN_LAG_SAMPLE = int(round(PULSE_ORIGIN_OFFSET * SAMPLE_RATE))
 
 
 def bandpass_filter(signal, band, sample_rate=SAMPLE_RATE):
@@ -33,88 +73,264 @@ def bandpass_filter(signal, band, sample_rate=SAMPLE_RATE):
     N = len(signal)
     low_freq, high_freq = band
 
-    X = np.fft.rfft(signal) #FFT the whole signal to get frequency components
-    freqs = np.fft.rfftfreq(N,d=1.0/sample_rate) 
+    X = np.fft.rfft(signal)  # FFT the whole signal to get frequency components
+    freqs = np.fft.rfftfreq(N, d=1.0 / sample_rate)
 
-    #Keeping track of the frequencies in range
-    mask = np.zeros_like(freqs,dtype=float) 
-    in_band = (freqs >= low_freq) & (freqs<=high_freq)
+    # Keeping track of the frequencies in range
+    mask = np.zeros_like(freqs, dtype=float)
+    in_band = (freqs >= low_freq) & (freqs <= high_freq)
     mask[in_band] = 1.0
 
-
-    ## smooth edges of the mask to prevent abrupt changes
+    # smooth edges of the mask to prevent abrupt changes
     taper_width = 5
     band_indices = np.where(in_band)[0]
     if len(band_indices) > 2 * taper_width:
         for i in range(taper_width):
-            fade = 0.5 * (1 - np.cos(np.pi*i/taper_width))
+            fade = 0.5 * (1 - np.cos(np.pi * i / taper_width))
             mask[band_indices[i]] = fade
-            mask[band_indices[-(i+1)]] = fade
+            mask[band_indices[-(i + 1)]] = fade
 
     # Apply the created mask and IFFT back
     X_filtered = X * mask
-    filtered_signal = np.fft.irfft(X_filtered,n=N)
+    filtered_signal = np.fft.irfft(X_filtered, n=N)
 
-    noise_component = signal - filtered_signal # the noise part
+    noise_component = signal - filtered_signal  # the noise part
 
-    spectrum = np.abs(X)/ N # magnitude spectrum
+    spectrum = np.abs(X) / N  # magnitude spectrum
 
-    return filtered_signal,noise_component,spectrum
+    return filtered_signal, noise_component, spectrum
 
 
-def generate_template(signal_type='sonar'):
-    """Build the known pulse template for matched filtering.
-        This is the "reference copy" of what we transmitted - cross-
-        correlating it against the received signal finds the echo
+def generate_template(signal_type='sonar', size=REFERENCE_SHIP_SIZE):
+    """
+    Full-length reference copy of the pulse we expect, centred at
+    PULSE_ORIGIN_OFFSET — the same place the generators in signal_engine
+    put theirs before adding travel delay.
+
+    Kept for plotting and for anything that wants to see the template on
+    the same time axis as the signal. The detector itself uses the
+    compact quadrature pair below.
     """
     t = time_axis()
 
     if signal_type == 'sonar':
-        # Sonar template: which is Gaussian ping shape we transmit, centered at t=0.5
-        template = gaussian_ping(t,SONAR_FREQ,SONAR_SIGMA,1.0,center=0.5)
-    else:
-        template = gaussian_ping(t,BOMB_FREQ, BOMB_SIGMA,1.0,center=0.5)
-    return template
-def matched_filter(filtered_signal, template):
-    """Cross corelate the filtered signal with the known template.
-        The peak position tells us the time delay (and thus distance).
-        The peak height tell us detection confidence.
+        return gaussian_ping(t, SONAR_FREQ, size_pulse_width(size), 1.0,
+                             center=PULSE_ORIGIN_OFFSET)
+    if signal_type == 'hull':
+        return gaussian_ping(t, HULL_FREQ, HULL_SIGMA, 1.0,
+                             center=PULSE_ORIGIN_OFFSET)
+    return gaussian_ping(t, BOMB_FREQ, BOMB_SIGMA, 1.0,
+                         center=PULSE_ORIGIN_OFFSET)
 
-        Returns:(correlation,peak_index,peak_value,estimated_delay)
+
+def _compact_quadrature_template(freq, sigma):
     """
+    The pulse cropped to the few hundred milliseconds it actually
+    occupies, as a sine/cosine pair.
 
-    # normalize template to unit energy so peak heights are comparable
-    template_norm = template/(np.linalg.norm(template) + 1e-10)
+    Two reasons it is built this way rather than as a full 600-sample
+    array with the pulse buried in it:
 
-    # cross-correlation - 'same' mode keeps output length = input length
-    correlation = np.correlate(filtered_signal,template_norm,mode='same')
+    * Length. Correlating two 600-sample arrays leaves the ends of the
+      output with almost no overlap, so the trace tapers to nearly zero
+      at both edges. Any robust noise estimate taken over that trace is
+      then dominated by the dead ends and comes out far too low, which
+      is what used to make pure ocean noise look like a solid contact.
+    * Phase. The echo's carrier phase depends on its arrival time, so a
+      fixed-phase template only matches at some delays. Correlating
+      against sine AND cosine and taking the magnitude gives the
+      envelope, which is phase-independent — the textbook matched filter
+      for a pulse of unknown phase.
+    """
+    half = int(round(4.0 * sigma * SAMPLE_RATE))
+    n = 2 * half + 1
+    tau = (np.arange(n) - half) / SAMPLE_RATE
+    envelope = np.exp(-0.5 * (tau / sigma) ** 2)
 
-    # find the peak
-    peak_index = np.argmax(np.abs(correlation))
+    t_sin = envelope * np.sin(2 * np.pi * freq * tau)
+    t_cos = envelope * np.cos(2 * np.pi * freq * tau)
+
+    norm = np.linalg.norm(t_sin) + 1e-12
+    return t_sin / norm, t_cos / norm, half
+
+
+def _envelope_correlate(signal, t_sin, t_cos):
+    """Quadrature matched filter -> phase-independent envelope."""
+    cs = np.correlate(signal, t_sin, mode='same')
+    cc = np.correlate(signal, t_cos, mode='same')
+    return np.sqrt(cs ** 2 + cc ** 2)
+
+
+class _Detector:
+    """One hypothesis: a band, a pulse shape, and its calibration."""
+
+    def __init__(self, name, band, freq, sigma, size=None):
+        self.name = name
+        self.band = band
+        self.freq = freq
+        self.sigma = sigma
+        self.size = size
+        self.t_sin, self.t_cos, self.half = _compact_quadrature_template(freq, sigma)
+
+        # Calibrate: push a clean, noiseless pulse of amplitude 1.0
+        # through the exact same chain and record the peak it produces.
+        # Dividing a measured peak by this recovers the arriving
+        # amplitude, which is what the size estimate is built on. Doing
+        # it by measurement rather than by algebra means the bandpass
+        # filter's own loss is automatically accounted for.
+        t = time_axis()
+        reference = gaussian_ping(t, freq, sigma, 1.0, center=PULSE_ORIGIN_OFFSET)
+        filtered, _, _ = bandpass_filter(reference, band)
+        env = _envelope_correlate(filtered, self.t_sin, self.t_cos)
+        self.unit_peak = float(np.max(env)) or 1.0
+
+    def run(self, signal):
+        filtered, _residue, _spectrum = bandpass_filter(signal, self.band)
+
+        # Pad before correlating so that EVERY sample position gets the
+        # full template laid over it. Without this the usable lag range
+        # starts `half` samples in — and for the broad, low-frequency
+        # blast template that is 0.6s, which is past the arrival time of
+        # any bomb going off nearby. Close explosions were landing
+        # outside the search window and being reported as "nothing".
+        pad = self.half
+        padded = np.concatenate([np.zeros(pad), filtered, np.zeros(pad)])
+        env_full = _envelope_correlate(padded, self.t_sin, self.t_cos)
+        env = env_full[pad:pad + len(filtered)]
+
+        n = len(env)
+        # Nothing can arrive before it was transmitted, so only search
+        # from the zero-delay position onwards. A couple of samples of
+        # slack absorbs quantisation.
+        lo = max(0, _MIN_LAG_SAMPLE - 3)
+        hi = max(lo + 1, n)
+        window = env[lo:hi]
+
+        rel_peak = int(np.argmax(window))
+        peak_index = lo + rel_peak
+        peak_value = float(window[rel_peak])
+
+        # Noise floor: the typical envelope level away from the peak.
+        # The median is used rather than the mean so one loud echo cannot
+        # inflate the floor it is being measured against.
+        guard = max(4, int(round(2.0 * self.sigma * SAMPLE_RATE)))
+        mask = np.ones(window.shape, dtype=bool)
+        mask[max(0, rel_peak - guard):rel_peak + guard + 1] = False
+        background = window[mask] if mask.sum() >= 32 else window
+        floor = float(np.median(background))
+        if not np.isfinite(floor) or floor < 1e-9:
+            floor = 1e-9
+
+        snr = peak_value / floor
+
+        # peak index maps straight onto the pulse's arrival time, so the
+        # delay is just that time minus where an undelayed pulse sits.
+        arrival_time = peak_index / SAMPLE_RATE
+        delay = arrival_time - PULSE_ORIGIN_OFFSET
+
+        return {
+            'filtered': filtered,
+            'correlation': env.tolist(),
+            'peak_index': peak_index,
+            'peak_value': peak_value,
+            'amplitude': peak_value / self.unit_peak,
+            'floor': floor,
+            'snr': snr,
+            'delay': delay,
+            'detected': (snr >= SNR_DETECTION_THRESHOLD
+                         and peak_value >= MIN_PEAK_ABSOLUTE),
+            'confidence': snr_to_confidence(snr),
+            'size_hypothesis': self.size,
+        }
+
+
+# Built once at import — the calibration pass is not free.
+_SONAR_DETECTORS = [
+    _Detector(f'sonar{s}', SONAR_BAND, SONAR_FREQ, size_pulse_width(s), size=s)
+    for s in SONAR_SIZE_HYPOTHESES
+]
+_BOMB_DETECTOR = _Detector('bomb', BOMB_BAND, BOMB_FREQ, BOMB_SIGMA)
+_HULL_DETECTOR = _Detector('hull', HULL_BAND, HULL_FREQ, HULL_SIGMA)
+
+
+def snr_to_confidence(snr):
+    """
+    Map signal-to-noise ratio onto a 0..1 confidence.
+
+    A logistic in log-SNR, centred on the detection threshold: exactly at
+    threshold the meter reads 50%, comfortably above it approaches 100%,
+    and pure ocean noise sits near 0%. Always inside 0..1, so the UI can
+    print it as a percentage without producing nonsense.
+    """
+    s = max(float(snr), 1e-6)
+    x = (np.log(s) - np.log(SNR_DETECTION_THRESHOLD)) / CONFIDENCE_SLOPE
+    x = float(np.clip(x, -60.0, 60.0))
+    return float(1.0 / (1.0 + np.exp(-x)))
+
+
+def matched_filter(filtered_signal, template):
+    """
+    Back-compatible cross-correlation helper.
+
+    Returns: (correlation, peak_index, peak_value, estimated_delay)
+    """
+    template_unit = template / (np.linalg.norm(template) + 1e-10)
+    correlation = np.correlate(filtered_signal, template_unit, mode='same')
+
+    peak_index = int(np.argmax(np.abs(correlation)))
     peak_value = float(np.abs(correlation[peak_index]))
 
-    # converting sample index to time delay
-    # 'same' mode centers the output, so index 0 = -N/2 delay
-    center_offset = len(filtered_signal)//2
-    delay_samples = peak_index - center_offset
-    estimated_delay = delay_samples/SAMPLE_RATE
+    center_offset = len(filtered_signal) // 2
+    estimated_delay = (peak_index - center_offset) / SAMPLE_RATE
 
-    return correlation.tolist(), int(peak_index), peak_value, estimated_delay
+    return correlation.tolist(), peak_index, peak_value, estimated_delay
 
 
-def classify_signal(signal, sample_rate = SAMPLE_RATE):
+def delay_to_distance(delay, round_trip=True):
     """
-    Determine whether a detected signal is sonar or bomb
-    by comparing energy in each frequency band.
+    Inverse of signal_engine.distance_to_delay().
+
+    An ECHO travelled out and back, so the same delay means half the
+    distance that a one-way DIRECT arrival would. Getting this backwards
+    is what made sonar readings and shockwave readings disagree about how
+    far away the same thing was.
+    """
+    d = abs(float(delay))
+    cells = d / DELAY_PER_CELL
+    return cells if round_trip else 2.0 * cells
+
+
+def estimate_target_size(amplitude, distance, source_amplitude=SONAR_AMPLITUDE):
+    """
+    Work backwards from how loud the echo was to how big the thing that
+    produced it must be.
+
+    The generator built the echo as
+        amp = source_amplitude * sqrt(size / 3) / (1 + alpha * distance)
+    so invert that. `amplitude` is the arriving amplitude recovered by
+    the detector's calibration. Returns a float; the caller clamps.
+    """
+    if distance is None or amplitude is None or amplitude <= 0:
+        return None
+
+    strength = amplitude * (1.0 + ATTENUATION_ALPHA * float(distance)) / source_amplitude
+    if strength <= 0:
+        return None
+    return REFERENCE_SHIP_SIZE * (strength ** 2)
+
+
+def classify_signal(signal, sample_rate=SAMPLE_RATE):
+    """
+    Coarse energy-based check of which band carries the event.
+    Kept as a sanity check alongside the matched-filter decision in
+    process_signal(), which is what actually decides.
     Returns: 'sonar', 'bomb', or 'unknown'
     """
     N = len(signal)
-    X = np.fft.rfft(signal) # FFT
+    X = np.fft.rfft(signal)
 
-    dt = 1.0 / sample_rate
-    freqs = np.fft.rfftfreq(N, d = dt)
-
-    power = np.abs(X)**2
+    freqs = np.fft.rfftfreq(N, d=1.0 / sample_rate)
+    power = np.abs(X) ** 2
 
     sonar_mask = (freqs >= SONAR_BAND[0]) & (freqs <= SONAR_BAND[1])
     bomb_mask = (freqs >= BOMB_BAND[0]) & (freqs <= BOMB_BAND[1])
@@ -125,84 +341,156 @@ def classify_signal(signal, sample_rate = SAMPLE_RATE):
     min_energy = 0.01
     if sonar_energy < min_energy and bomb_energy < min_energy:
         return 'unknown'
-    elif sonar_energy > bomb_energy * CLASSIFICATION_MARGIN:
+    if sonar_energy > bomb_energy * CLASSIFICATION_MARGIN:
         return 'sonar'
-    
-    return 'bomb'
+    if bomb_energy > sonar_energy * CLASSIFICATION_MARGIN:
+        return 'bomb'
+    return 'unknown'
 
-    
 
 def process_signal(raw_signal):
     """
     Full DSP pipeline for one ship's received signal.
-    This is the main entry point — takes a raw signal array
-    and returns everything the frontend needs to display.
-    Pipeline:
-    1. Bandpass filter (try sonar band first, then bomb band)
-    2. Cross-correlate with matched template
-    3. Peak detection + distance estimate
-    4. Signal type classification
-    Returns dict with all three signal layers + detection results.
 
-    Display layers:
-      - raw_signal     : the unprocessed received waveform (drawn as 'noise' canvas)
-      - filtered_signal: bandpass-filtered version — visually distinct from raw
-      - detected_signal: matched-filter (correlation) output — peaks indicate detection
+    Runs three independent detectors over the same recording:
+
+      * SONAR channel — a bank of ping templates, one per plausible
+        submarine size. The template that matches best both finds the
+        echo and hints at how big the target is.
+      * BOMB channel  — the low-frequency blast front.
+      * HULL channel  — the high-frequency ring of a hull breaking up.
+        This only ever exists when a bomb actually struck something, so
+        it is what separates a HIT from a MISS. A blast with no ring is
+        a splash in open water.
+
+    Whichever channel stands furthest above its own noise floor wins, and
+    the hull channel is what upgrades a plain 'bomb' to a 'bomb_hit'.
+
+    Returns
+    -------
+    dict with the three display layers plus:
+        detected             bool
+        signal_type          'sonar' | 'bomb_hit' | 'bomb_miss' | 'unknown'
+        signal_class         'sonar' | 'bomb' | 'unknown'   (coarse)
+        confidence           0..1
+        snr                  peak height in units of the local noise floor
+        estimated_distance   cells, under the hypothesis matching signal_type
+        estimated_distance_echo    cells, if this were a round-trip echo
+        estimated_distance_direct  cells, if this were a one-way arrival
+        estimated_size       cells, best guess at the target's size
+        hull_ring            bool, was a hull heard breaking up
     """
 
-    signal = np.array(raw_signal)
+    signal = np.array(raw_signal, dtype=float)
 
-    # Try sonar band first
-    sonar_filtered, sonar_noise, sonar_spectrum = bandpass_filter(signal, SONAR_BAND)
-    sonar_template = generate_template('sonar')
-    sonar_corr, sonar_peak_idx, sonar_peak_val, sonar_delay = matched_filter(sonar_filtered, sonar_template)
+    # ---- sonar template bank (one hypothesis per submarine size) ----
+    sonar_runs = [(d, d.run(signal)) for d in _SONAR_DETECTORS]
+    best_det, sonar = max(sonar_runs, key=lambda pair: pair[1]['snr'])
+    best_size_hyp = best_det.size
 
-    # Try bomb band
-    bomb_filtered, bomb_noise, bomb_spectrum = bandpass_filter(signal, BOMB_BAND)
-    bomb_template = generate_template('bomb')
-    bomb_corr, bomb_peak_idx, bomb_peak_val, bomb_delay = matched_filter(bomb_filtered, bomb_template)
+    # ---- bomb blast and hull ring ----
+    bomb = _BOMB_DETECTOR.run(signal)
+    hull = _HULL_DETECTOR.run(signal)
 
-    # Decision: neither channel clears the threshold → no detection
     detected = False
     signal_type = 'unknown'
-    est_dist = None
-    confidence = 0.0
+    signal_class = 'unknown'
+    est_dist = est_dist_echo = est_dist_direct = None
+    est_size = None
 
-    if sonar_peak_val <= DETECTION_THRESHOLD and bomb_peak_val <= DETECTION_THRESHOLD:
-        # No event detected — show sonar-band filtered output by default
-        filtered = sonar_filtered
-        correlation = sonar_corr
-        peak_idx = sonar_peak_idx
-    else:
+    # A hull ring only exists when a blast broke something, so hearing
+    # one is the hit. We still want some corroboration from the blast
+    # channel before calling it, otherwise a stray noise spike in the
+    # hull band could announce a hit during quiet ocean — but we accept
+    # a weaker blast than the full threshold, because at long range the
+    # low-frequency thump fades faster than the ring does.
+    hull_corroborated = bomb['detected'] or bomb['snr'] >= 0.6 * SNR_DETECTION_THRESHOLD
+
+    if hull['detected'] and hull_corroborated:
         detected = True
-        signal_type = classify_signal(signal)
-
-        if signal_type == 'sonar':
-            confidence = sonar_peak_val
-            est_dist = abs(sonar_delay) / DELAY_PER_CELL
-            filtered = sonar_filtered
-            correlation = sonar_corr
-            peak_idx = sonar_peak_idx
+        signal_type = 'bomb_hit'
+        signal_class = 'bomb'
+        chosen = bomb if bomb['detected'] else hull
+        # Range comes from the blast front when we have it; otherwise
+        # back it out of the ring, which arrives a fixed lag later.
+        if bomb['detected']:
+            ranging_delay = bomb['delay']
         else:
-            confidence = bomb_peak_val
-            est_dist = abs(bomb_delay) / DELAY_PER_CELL
-            filtered = bomb_filtered
-            correlation = bomb_corr
-            peak_idx = bomb_peak_idx
+            ranging_delay = max(0.0, hull['delay'] - HULL_RING_LAG)
+        est_dist_direct = delay_to_distance(ranging_delay, round_trip=False)
+        est_dist_echo = delay_to_distance(ranging_delay, round_trip=True)
+        est_dist = est_dist_direct
+        # Ring loudness scales with the struck boat's size.
+        est_size = estimate_target_size(
+            hull['amplitude'], est_dist_direct,
+            source_amplitude=HULL_AMPLITUDE,
+        )
+    elif bomb['detected'] and bomb['snr'] >= sonar['snr']:
+        # Blast with no hull ring: the bomb went into open water.
+        detected = True
+        signal_type = 'bomb_miss'
+        signal_class = 'bomb'
+        chosen = bomb
+        est_dist_direct = delay_to_distance(bomb['delay'], round_trip=False)
+        est_dist_echo = delay_to_distance(bomb['delay'], round_trip=True)
+        est_dist = est_dist_direct
+    elif sonar['detected']:
+        detected = True
+        signal_type = 'sonar'
+        signal_class = 'sonar'
+        chosen = sonar
+        est_dist_echo = delay_to_distance(sonar['delay'], round_trip=True)
+        est_dist_direct = delay_to_distance(sonar['delay'], round_trip=False)
+        est_dist = est_dist_echo
+        est_size = estimate_target_size(sonar['amplitude'], est_dist_echo,
+                                        source_amplitude=SONAR_AMPLITUDE)
+    else:
+        # Nothing cleared the bar. Show the sonar channel by default, and
+        # still report the confidence we actually measured rather than a
+        # hard zero — "we heard something, but not enough of it" is real
+        # information and the meter should say so.
+        chosen = sonar if sonar['snr'] >= bomb['snr'] else bomb
+
+    confidence = chosen['confidence']
+    snr = chosen['snr']
+
+    # Blend the shape-matched size hypothesis with the amplitude-derived
+    # one, then clamp to something a submarine could plausibly be.
+    if est_size is not None:
+        if signal_type == 'sonar':
+            est_size = 0.5 * est_size + 0.5 * best_size_hyp
+        est_size = int(round(min(MAX_REPORTED_SIZE,
+                                 max(MIN_REPORTED_SIZE, est_size))))
 
     return {
         # Raw waveform: displayed on the 'noise' canvas so the user sees
-        # the unfiltered signal and can compare it against the filtered version.
+        # the unfiltered signal and can compare it against the filtered one.
         'raw_signal':      raw_signal,
         # Bandpass-filtered signal: displayed on the 'filtered' canvas.
-        # This is visually distinct from the raw signal — high-freq noise
-        # is removed, leaving only the band of interest.
-        'noise_component': filtered.tolist(),
-        # Matched-filter (cross-correlation) output: peaks indicate detection.
-        'detected_signal': correlation,
+        # Visually distinct from the raw signal — out-of-band noise is
+        # gone, leaving only the band of interest.
+        'noise_component': chosen['filtered'].tolist(),
+        # Matched-filter envelope: peaks indicate detection.
+        'detected_signal': chosen['correlation'],
         'detected':        detected,
         'signal_type':     signal_type,
-        'confidence':      round(confidence, 4),
-        'estimated_distance': round(est_dist, 2) if est_dist else None,
-        'peak_sample_index':  peak_idx,
+        'signal_class':    signal_class,
+        'confidence':      round(float(confidence), 4),
+        'snr':             round(float(snr), 2),
+        'estimated_distance':        round(est_dist, 2) if est_dist is not None else None,
+        'estimated_distance_echo':   round(est_dist_echo, 2) if est_dist_echo is not None else None,
+        'estimated_distance_direct': round(est_dist_direct, 2) if est_dist_direct is not None else None,
+        'estimated_size':  est_size,
+        'hull_ring':       bool(hull['detected']),
+        'peak_sample_index': chosen['peak_index'],
+        # Per-channel diagnostics — handy for the write-up and for tuning.
+        'channels': {
+            'sonar': {'snr': round(sonar['snr'], 2),
+                      'peak': round(sonar['peak_value'], 4),
+                      'size_hypothesis': best_size_hyp},
+            'bomb':  {'snr': round(bomb['snr'], 2),
+                      'peak': round(bomb['peak_value'], 4)},
+            'hull':  {'snr': round(hull['snr'], 2),
+                      'peak': round(hull['peak_value'], 4)},
+        },
     }
