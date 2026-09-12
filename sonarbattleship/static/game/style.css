@@ -1612,3 +1612,218 @@ h4, h5 {
         max-width: none;
     }
 }
+
+/* ============================================================
+   v0.7.2 — TYPE SCALE
+   Everything in the console was set too small to read at a
+   glance. Bumped roughly one step across the board, with the
+   sidebar widened to match so the tables still fit their
+   columns rather than clipping them again.
+   ============================================================ */
+
+.game-sidebar {
+    width: 336px;
+    min-width: 336px;
+    max-width: 336px;
+}
+
+/* --- panels --- */
+.mil-panel-header {
+    padding: 8px 11px;
+}
+
+.mil-panel-title {
+    font-size: 0.8rem;
+}
+
+.mil-panel-meta {
+    font-size: 0.72rem;
+}
+
+/* --- tables --- */
+.mil-table {
+    font-size: 0.76rem;
+}
+
+.mil-table thead th {
+    font-size: 0.68rem;
+    padding: 6px 6px;
+}
+
+.mil-table tbody td {
+    padding: 5px 6px;
+}
+
+.mil-table tbody td:first-child,
+.mil-table thead th:first-child {
+    padding-left: 11px;
+}
+
+.mil-table tbody td:last-child,
+.mil-table thead th:last-child {
+    padding-right: 10px;
+}
+
+.mil-chip {
+    font-size: 0.66rem;
+    padding: 1px 5px;
+    line-height: 1.4;
+}
+
+.mil-conf {
+    min-width: 42px;
+    padding: 0 4px;
+}
+
+.mil-empty td {
+    font-size: 0.72rem;
+}
+
+.mil-table-wrap {
+    max-height: 178px;
+}
+
+/* --- bearing console --- */
+#angle-picker {
+    width: 196px;
+    height: 196px;
+}
+
+.dial-deg {
+    font-size: 13px;
+}
+
+.console-row {
+    font-size: 0.86rem;
+    padding: 6px 9px;
+}
+
+.console-key {
+    font-size: 0.74rem;
+    min-width: 38px;
+}
+
+.console-input {
+    font-size: 1.15rem;
+}
+
+.console-unit {
+    font-size: 0.95rem;
+}
+
+.sonar-origin-display {
+    font-size: 0.78rem;
+}
+
+.sonar-origin-display.is-set {
+    font-size: 1.15rem;
+}
+
+.ping-btn {
+    font-size: 0.95rem;
+    padding: 11px 12px;
+}
+
+.emcon-warning {
+    font-size: 0.7rem;
+    line-height: 1.45;
+    padding: 5px 0 5px 9px;
+}
+
+/* --- passive summary --- */
+.ps-brg {
+    font-size: 0.95rem;
+}
+
+.ps-rng {
+    font-size: 0.8rem;
+}
+
+.ps-body {
+    font-size: 0.88rem;
+    line-height: 1.45;
+}
+
+.passive-summary {
+    padding: 10px 11px;
+}
+
+/* --- board furniture --- */
+.grid-label-left,
+.grid-label-right {
+    font-size: 0.95rem;
+}
+
+.grid-cell.grid-header {
+    font-size: 0.78rem;
+}
+
+.badge {
+    font-size: 0.88rem;
+}
+
+.turn-mine,
+.turn-opponent {
+    font-size: 0.95rem;
+}
+
+.overlay-tag {
+    font-size: 12px;
+}
+
+/* --- oscilloscope column --- */
+.signal-panel-title {
+    font-family: var(--font-stencil);
+    font-size: 1.05rem;
+}
+
+.signal-ship-name {
+    font-family: var(--font-mono);
+    font-size: 0.84rem;
+}
+
+.signal-row-label {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+}
+
+.signal-detection-readout {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+}
+
+.signal-time-readout,
+.signal-ship-controls .signal-time-readout {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+}
+
+.signal-ship-controls .signal-playback-btn {
+    font-size: 0.82rem;
+}
+
+.event-tag {
+    font-size: 0.68rem;
+}
+
+.ship-status {
+    font-size: 0.82rem;
+}
+
+@media (max-width: 900px) {
+    .game-sidebar {
+        width: 100%;
+        min-width: 0;
+        max-width: none;
+    }
+}
+
+/* The dial's viewBox was widened to -122..122 so the larger 3-digit
+   degree labels are not sliced by its edge; grow the rendered box to
+   match, otherwise the ring itself shrinks. Must stay square and
+   centred on (0,0) — the click handler maps the element's centre to
+   bearing 0. */
+#angle-picker {
+    width: 208px;
+    height: 208px;
+}
