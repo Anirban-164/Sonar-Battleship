@@ -5,8 +5,8 @@ import math
 # Constants
 # ------------------------------------------------------------
 
-SAMPLE_RATE = 200        # samples/sec
-SIGNAL_DURATION = 3.0    # seconds of signal per snapshot
+SAMPLE_RATE = 200 # samples/sec
+SIGNAL_DURATION = 3.0 # seconds of signal per snapshot
 NUM_SAMPLES = int(SAMPLE_RATE * SIGNAL_DURATION)
 
 # Every generator places its pulse at PULSE_ORIGIN_OFFSET + delay, and the
@@ -95,19 +95,22 @@ SIDE_LOBE_FALLOFF_DEG = 45.0    # degrees for the side lobes to fall by 1/e
 # ########## core signal generators ##############
 def time_axis():
     """ generates the time axis for a signal snapshot """
-    return np.linspace(0, SIGNAL_DURATION, NUM_SAMPLES, endpoint=False)
+    t = np.linspace(0, SIGNAL_DURATION, NUM_SAMPLES, endpoint = False)
+
+    return t
 
 
 def gaussian_ping(t, freq, sigma, amp, center):
     """
-    Generates a Gaussian-windowed sine pulse (a 'ping').
-    Formula: p(t) = amp * exp(-(t - center)^2 / (2 * sigma^2)) * sin(2 * pi * freq * t)
-    The Gaussian part makes it a short burst rather than an infinite wave,
-    useful for matched filtering later.
+    - generates a ping
+    Formula: p(t) = A * e^(- (t-c)^2 / (2 * sigma^2)) * sin(wt)
+    - the gaussian envelope makes it a short burst rather than an infinite wave -->
+    useful for matched filtering later...
     """
-
-    expo = np.exp(-0.5 * (((t - center) / sigma) ** 2))
-    return amp * expo * np.sin(2 * np.pi * freq * t)
+    envelope = np.exp(-0.5 * (((t - center) / sigma) ** 2))
+    p = amp * envelope * np.sin(2 * np.pi * freq * t)
+    
+    return p
 
 
 def attenuate(amp, dist):
