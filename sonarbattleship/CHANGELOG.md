@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.3] — 2026-09-22
+
+### Fixed
+- **Sunk Ships Still Showing Signals**: A wreck can't listen — sunk ships are now skipped in both the backend (no signal generated/processed) and the frontend (no idle noise animation). Their column stays visible but goes dark.
+- **No Pause When Signal Arrives**: Firing sonar or receiving a blast used to update the signal panel silently while the game kept polling. Now the signal panel shows an "Analysing received signal..." overlay and blocks further signal polling for 4 seconds, giving the player time to read the waveform sweep and detection readout before the next event overwrites it.
+- **Multiple Ships Falsely Labelled ECHO**: When only one ship fires sonar, only that ship's column should say ECHO — other ships hear a weaker copy but aren't the origin. The backend now sends `origin_ship_idx`, and non-origin ships are tagged LISTENING instead of ECHO.
+- **No Indication Of Strongest Detection**: When multiple ships receive signals, the column with the highest correlation peak is now highlighted with a golden border glow (`best-peak` CSS class) so the player instantly sees which hydrophone has the most reliable data. The backend sends `best_ship_idx` to drive this.
+
 ## [0.7.2] — 2026-09-12
 
 ### Changed
