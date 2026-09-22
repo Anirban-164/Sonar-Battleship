@@ -614,6 +614,22 @@ def api_signals(request, room_code):
         # nothing new, just ocean noise
         signals = generate_idle_signals(len(my_ships))
 
+    # For bomb events, identify which ship was closest to the blast
+    # (i.e. the one actually hit) so the frontend highlights the right column.
+    _hit_ship_idx = None
+    if event_type in ('bomb_hit', 'bomb_miss') and latest_action:
+        import math as _math
+        blast_r, blast_c = latest_action.target_row, latest_action.target_col
+        _best_blast_d = float('inf')
+        for _i, _s in enumerate(my_ships):
+            if _s.get('is_sunk', False):
+                continue
+            for _c in (_s.get('cells') or []):
+                _d = _math.sqrt((_c[0] - blast_r)**2 + (_c[1] - blast_c)**2)
+                if _d < _best_blast_d:
+                    _best_blast_d = _d
+                    _hit_ship_idx = _i
+
     # run each ship's raw signal through the DSP pipeline
     # skip sunk ships entirely — a wreck can't listen
     processed_signals = {}
@@ -664,10 +680,15 @@ def api_signals(request, room_code):
     # origin_ship_idx: which of my ships fired the sonar (for sonar_echo only)
     origin_idx = _origin_ship_idx if event_type == 'sonar_echo' else None
 
+    # For bomb events, override best_ship_idx with the ship that was
+    # actually closest to the blast (the one that should show the signal).
+    effective_best = _hit_ship_idx if _hit_ship_idx is not None else best_peak_idx
+
     return JsonResponse({
         'signals': processed_signals,
         'event_type': event_type,
         'action_id': str(latest_action.id) if latest_action else '',
         'origin_ship_idx': origin_idx,
-        'best_ship_idx': best_peak_idx,
+        'best_ship_idx': effective_best,
+        'hit_ship_idx': _hit_ship_idx,
     })

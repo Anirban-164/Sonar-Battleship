@@ -300,6 +300,7 @@
     }
 
     async function pollState() {
+        if (signalAnalysisLock) return;  // game frozen during signal analysis
         try {
             const res = await fetch(`/api/room-state/${ROOM_CODE}/`);
             if (!res.ok) return;
@@ -1056,6 +1057,7 @@
         if (!gameState || !gameState.is_my_turn) return;
         if (gameState.status !== 'in_progress') return;
         if (actionInProgress) return;
+        if (signalAnalysisLock) return;  // game frozen during signal analysis
 
         if (!sonarOrigin) {
             alert('Select an undamaged ship cell on your grid first!');
@@ -1141,6 +1143,7 @@
         if (gameState.status !== 'in_progress') return;
         if (selectedAction !== 'fire') return;
         if (actionInProgress) return;
+        if (signalAnalysisLock) return;  // game frozen during signal analysis
 
         actionInProgress = true;
         // Play explosion animation immediately on click
