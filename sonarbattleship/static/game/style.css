@@ -1827,3 +1827,57 @@ h4, h5 {
     width: 208px;
     height: 208px;
 }
+
+/* ============================================
+   Signal Fixes — analysis overlay, best-peak,
+   sunk ship dimming
+   ============================================ */
+
+/* Fix 2: semi-transparent overlay during 4s analysis pause */
+.signal-analysis-overlay {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 16px;
+    margin-top: 10px;
+    background: rgba(79, 195, 247, 0.08);
+    border: 1px solid rgba(79, 195, 247, 0.2);
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 0.8rem;
+    color: #4fc3f7;
+    letter-spacing: 0.04em;
+    animation: analysis-pulse 1.5s ease-in-out infinite;
+}
+
+.signal-analysis-overlay.hidden {
+    display: none;
+}
+
+.analysis-spinner {
+    display: inline-block;
+    animation: spin 1s linear infinite;
+    font-size: 1rem;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+@keyframes analysis-pulse {
+    0%, 100% { opacity: 0.7; }
+    50%      { opacity: 1.0; }
+}
+
+/* Fix 4: golden highlight on the ship with the strongest detection peak */
+.signal-ship-col.best-peak {
+    border-color: rgba(255, 215, 0, 0.5);
+    box-shadow: 0 0 16px rgba(255, 215, 0, 0.15),
+                inset 0 0 8px rgba(255, 215, 0, 0.05);
+}
+
+.signal-ship-col.best-peak .signal-ship-name {
+    color: #ffd740;
+}

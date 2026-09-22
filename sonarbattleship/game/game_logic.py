@@ -1,8 +1,10 @@
 """
-game_logic.py — Core game rules and mechanics.
-
-Ship fleet config, placement validation, sonar (angular bearing-based + DSP),
-fire processing, and win condition checks.
+core game rules and mechanics
+- ship fleet config
+- placement validation
+- sonar (angular bearing-based + DSP)
+- fire processing
+- win condition checks
 """
 
 import math
@@ -41,7 +43,7 @@ def validate_ship_placement(cells, size, grid_size):
     Returns (is_valid, error_message)
     """
     if len(cells) != size:
-        return False, f"Expected {size} cells, got {len(cells)}"
+        return False, f"Expected {size} cells but got {len(cells)}"
 
     for r, c in cells:
         if r < 0 or r >= grid_size or c < 0 or c >= grid_size:

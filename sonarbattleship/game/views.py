@@ -531,6 +531,7 @@ def api_signals(request, room_code):
 
     event_type = 'idle'
     signals = {}
+    _origin_ship_idx = None
 
     if latest_action and str(latest_action.id) != last_seen_id:
         if latest_action.player_id == me.id:
@@ -555,6 +556,17 @@ def api_signals(request, room_code):
                     my_ships, enemy_ships,
                     room.grid_size, my_position
                 )
+
+                # figure out which ship index fired the sonar
+                import math as _math
+                _origin_ship_idx = 0
+                _best_d = float('inf')
+                for _i, _s in enumerate(my_ships):
+                    for _c in (_s.get('cells') or []):
+                        _d = _math.sqrt((_c[0] - origin[0])**2 + (_c[1] - origin[1])**2)
+                        if _d < _best_d:
+                            _best_d = _d
+                            _origin_ship_idx = _i
             else:
                 # I fired a bomb — my ships hear the explosion, and if it
                 # struck a hull they hear that break up too. The two are
@@ -603,8 +615,17 @@ def api_signals(request, room_code):
         signals = generate_idle_signals(len(my_ships))
 
     # run each ship's raw signal through the DSP pipeline
+    # skip sunk ships entirely — a wreck can't listen
     processed_signals = {}
+    best_peak_idx = None
+    best_peak_conf = -1
+
     for ship_idx, sig_data in signals.items():
+        idx_int = int(ship_idx)
+        # skip sunk ships
+        if idx_int < len(my_ships) and my_ships[idx_int].get('is_sunk', False):
+            continue
+
         processed = process_signal(sig_data['signal'])
 
         # An enemy ping sweeping past us is a DIRECT arrival, not an echo
@@ -614,6 +635,11 @@ def api_signals(request, room_code):
         distance = processed['estimated_distance']
         if event_type == 'incoming_sonar':
             distance = processed['estimated_distance_direct']
+
+        conf = processed['confidence']
+        if conf > best_peak_conf:
+            best_peak_conf = conf
+            best_peak_idx = idx_int
 
         processed_signals[ship_idx] = {
             'raw_signal': processed['raw_signal'],
@@ -635,8 +661,13 @@ def api_signals(request, room_code):
             'blocked_by_size': sig_data.get('blocked_by_size'),
         }
 
+    # origin_ship_idx: which of my ships fired the sonar (for sonar_echo only)
+    origin_idx = _origin_ship_idx if event_type == 'sonar_echo' else None
+
     return JsonResponse({
         'signals': processed_signals,
         'event_type': event_type,
         'action_id': str(latest_action.id) if latest_action else '',
+        'origin_ship_idx': origin_idx,
+        'best_ship_idx': best_peak_idx,
     })

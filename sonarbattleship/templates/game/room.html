@@ -223,6 +223,10 @@
             <div id="signal-grid" class="signal-grid">
                 <!-- JS builds 3 columns (one per ship), each with 3 canvas rows -->
             </div>
+            <!-- Analysis pause overlay -->
+            <div id="signal-analysis-overlay" class="signal-analysis-overlay hidden">
+                <span class="analysis-spinner">⟳</span> Analysing received signal...
+            </div>
         </div>
     </div>
 
@@ -1615,6 +1619,7 @@
     let shipEventSignals = {};
     let shipEventColors = {};
     let shipResumeTimers = {};
+    let signalAnalysisLock = false;  // true while the 4s analysis pause is active
 
     const SIGNAL_COLORS = {
         idle:            '#4fc3f7',
@@ -1742,6 +1747,8 @@
 
             gameState.my_ships.forEach((ship, idx) => {
                 if (shipPaused[idx]) return;
+                // sunk ships don't listen
+                if (ship.is_sunk) return;
 
                 // RAW SIGNAL: Full ambient ocean noise (unfiltered hydrophone pickup)
                 const rawCanvas = document.getElementById(`signal-canvas-${idx}-raw`);
@@ -1990,6 +1997,7 @@
     async function pollSignals() {
         if (!gameState || gameState.status !== 'in_progress') return;
         if (!signalPanelBuilt) return;
+        if (signalAnalysisLock) return;  // frozen during analysis pause
 
         const allPaused = gameState.my_ships.every((_, i) => shipPaused[i]);
         if (allPaused) return;
@@ -2004,9 +2012,16 @@
 
             const eventType = data.event_type || 'idle';
             const signals = data.signals || {};
+            const originShipIdx = data.origin_ship_idx;  // which ship fired (sonar_echo only)
+            const bestShipIdx = data.best_ship_idx;       // ship with strongest peak
 
             if (eventType !== 'idle') {
                 stopIdleAnimation();
+
+                // ---- Fix 2: freeze game UI for 4s while analysing ----
+                signalAnalysisLock = true;
+                const overlay = document.getElementById('signal-analysis-overlay');
+                if (overlay) { overlay.classList.remove('hidden'); }
 
                 const tagLabels = {
                     sonar_echo: 'ECHO', incoming_sonar: 'INCOMING',
@@ -2019,6 +2034,12 @@
                     bomb_hit: 'shockwave', bomb_miss: 'shockwave',
                 };
 
+                // ---- Fix 4: clear old highlights ----
+                gameState.my_ships.forEach((_, i) => {
+                    const col = document.getElementById(`signal-col-${i}`);
+                    if (col) col.classList.remove('best-peak');
+                });
+
                 Object.keys(signals).forEach(idxStr => {
                     const idx = parseInt(idxStr);
                     if (shipPaused[idx]) return;
@@ -2026,9 +2047,6 @@
                     const sigData = signals[idxStr];
                     if (!sigData) return;
 
-                    // Colour the correlation trace by what the detector
-                    // decided, not by the raw event: a hit rings red, a
-                    // miss stays grey, a sonar return is green.
                     const detColor = SIGNAL_COLORS[sigData.signal_type]
                                      || (sigData.signal_class === 'bomb' ? '#ef5350' : '#66bb6a');
                     shipEventColors[idx] = detColor;
@@ -2039,10 +2057,23 @@
                         detected: sigData.detected_signal,
                     };
 
+                    // ---- Fix 3: only the origin ship gets ECHO tag ----
                     const tag = document.getElementById(`event-tag-${idx}`);
                     if (tag) {
-                        tag.textContent = tagLabels[eventType] || 'IDLE';
-                        tag.className = `event-tag ${tagClasses[eventType] || 'idle'}`;
+                        if (eventType === 'sonar_echo' && originShipIdx != null && idx !== originShipIdx) {
+                            // non-origin ships just show they heard something faint
+                            tag.textContent = 'LISTENING';
+                            tag.className = 'event-tag idle';
+                        } else {
+                            tag.textContent = tagLabels[eventType] || 'IDLE';
+                            tag.className = `event-tag ${tagClasses[eventType] || 'idle'}`;
+                        }
+                    }
+
+                    // ---- Fix 4: highlight best peak ship ----
+                    if (bestShipIdx != null && idx === bestShipIdx) {
+                        const col = document.getElementById(`signal-col-${idx}`);
+                        if (col) col.classList.add('best-peak');
                     }
 
                     const rawCanvas = document.getElementById(`signal-canvas-${idx}-raw`);
@@ -2075,6 +2106,13 @@
                         });
                     }
                 });
+
+                // ---- Fix 2: release the analysis lock after 4 seconds ----
+                setTimeout(() => {
+                    signalAnalysisLock = false;
+                    const ov = document.getElementById('signal-analysis-overlay');
+                    if (ov) ov.classList.add('hidden');
+                }, 4000);
             }
         } catch (e) {
             console.error('Signal poll error:', e);
