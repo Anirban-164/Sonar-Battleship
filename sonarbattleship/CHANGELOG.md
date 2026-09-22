@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.4] — 2026-09-22
+
+### Fixed
+- **Bomb Signal Highlighted Wrong Ship**: When a bomb hit SUB-4, the signal freeze/highlight was appearing on SUB-3 instead. The `best_ship_idx` was picked purely by DSP confidence (noisy), which often chose the wrong ship. Now the backend computes `hit_ship_idx` — the ship closest to the blast cell — and uses it to override `best_ship_idx` for bomb events. The correct ship is always highlighted.
+- **Game Not Truly Pausing During Signal Analysis**: The 4-second analysis lock only blocked signal polling but not the main game state poller (`pollState`) or action submission (`fireSonar`, `onEnemyCellClick`). The game kept advancing turns in the background while the overlay was showing. Now `pollState`, `fireSonar`, and `onEnemyCellClick` all check `signalAnalysisLock` and refuse to run while it's active, so the entire game truly freezes for the analysis period.
+
 ## [0.7.3] — 2026-09-22
 
 ### Fixed
