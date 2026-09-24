@@ -652,6 +652,18 @@ def api_signals(request, room_code):
         if event_type == 'incoming_sonar':
             distance = processed['estimated_distance_direct']
 
+        # --- Fix: only the ORIGIN ship reports a sonar echo detection ---
+        # All ships hear the echo (signal_engine puts it on every
+        # hydrophone attenuated by distance), but non-origin ships
+        # shouldn't claim they "detected" something — only the ship
+        # that actually fired the ping reads the return.
+        ship_detected = processed['detected']
+        ship_signal_type = processed['signal_type']
+        if event_type == 'sonar_echo' and _origin_ship_idx is not None:
+            if idx_int != _origin_ship_idx:
+                ship_detected = False
+                ship_signal_type = 'unknown'
+
         conf = processed['confidence']
         if conf > best_peak_conf:
             best_peak_conf = conf
@@ -661,8 +673,8 @@ def api_signals(request, room_code):
             'raw_signal': processed['raw_signal'],
             'noise_component': processed['noise_component'],
             'detected_signal': processed['detected_signal'],
-            'detected': processed['detected'],
-            'signal_type': processed['signal_type'],
+            'detected': ship_detected,
+            'signal_type': ship_signal_type,
             'signal_class': processed['signal_class'],
             'confidence': processed['confidence'],
             'snr': processed['snr'],
@@ -670,7 +682,7 @@ def api_signals(request, room_code):
             'estimated_size': processed['estimated_size'],
             'hull_ring': processed['hull_ring'],
             'peak_sample_index': processed['peak_sample_index'],
-            'has_echo': processed['detected'],
+            'has_echo': ship_detected,
             # what the physics engine actually did, so the sonar ping
             # that bounced off our own hull can be labelled as such
             'blocked': bool(sig_data.get('blocked')),

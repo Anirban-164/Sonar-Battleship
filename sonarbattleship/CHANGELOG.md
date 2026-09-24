@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.5] — 2026-09-24
+
+### Fixed
+- **Echo Falsely Detected On Multiple Ships**: When one ship fires sonar, the echo signal was added to ALL ships' hydrophones (attenuated by distance). If two ships were close to the origin, the DSP detected the echo on both. Now `api_signals` suppresses the `detected` flag on non-origin ships for `sonar_echo` events — only the transmitting ship reports the contact.
+- **Incoming Hostile Ping Not Detected**: The incoming sonar signal was multiplied by an arbitrary `0.8` dampening factor that, combined with cross-grid distance attenuation, pushed it below the DSP detection threshold. Removed the factor — a direct one-way arrival should be at full `SONAR_AMPLITUDE × lobe_gain`, stronger than a round-trip echo.
+- **Incoming Ping Labelled "Sonar Echo"**: The DSP classifier can't tell the difference between our own echo and the enemy's ping (same frequency band), so the readout was always "Sonar echo". `formatDetectionReadout` now takes `eventType` context: when the event is `incoming_sonar`, the label reads "📡 Incoming ping" instead.
+
 ## [0.7.4] — 2026-09-22
 
 ### Fixed

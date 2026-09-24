@@ -1969,7 +1969,7 @@
         return `${(c * 100).toFixed(0)}%`;
     }
 
-    function formatDetectionReadout(sigData) {
+    function formatDetectionReadout(sigData, eventType) {
         // Our own ping bounced off a friendly hull — the beam never got
         // out, so whatever the correlator found says nothing about the
         // enemy. Say so plainly instead of reporting a bogus contact.
@@ -1982,7 +1982,16 @@
             return `No contact — confidence ${formatConfidence(sigData.confidence)}`;
         }
 
-        const label = SIGNAL_TYPE_LABELS[sigData.signal_type] || '❔ Contact';
+        // Context-aware label: when the defender hears an enemy ping,
+        // the DSP classifier just says 'sonar' (same frequency band),
+        // but we know from the event_type that it's an INCOMING ping,
+        // not our own echo coming back.
+        let label;
+        if (eventType === 'incoming_sonar' && sigData.signal_type === 'sonar') {
+            label = '📡 Incoming ping';
+        } else {
+            label = SIGNAL_TYPE_LABELS[sigData.signal_type] || '❔ Contact';
+        }
         const parts = [label];
 
         if (sigData.estimated_distance != null) {
@@ -2092,7 +2101,7 @@
 
                             const readout = document.getElementById(`signal-readout-${idx}`);
                             if (readout) {
-                                readout.textContent = formatDetectionReadout(sigData);
+                                readout.textContent = formatDetectionReadout(sigData, eventType);
                                 readout.classList.toggle('has-detection', !!sigData.detected);
                             }
 
