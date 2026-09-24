@@ -60,7 +60,7 @@ ATTENUATION_ALPHA = 0.12
 DELAY_PER_CELL = 0.12
 
 # Beam geometry — one number, used by every beam test in the project.
-BEAM_HALF_WIDTH = 12.0   # degrees either side of the chosen bearing
+BEAM_HALF_WIDTH = 9.0   # degrees either side of the chosen bearing
 
 # Target strength scales with submarine size. Amplitude goes with the
 # square root of the reflecting area, so a 5-cell boat comes back
@@ -492,7 +492,9 @@ def generate_incoming_sonar_signals(enemy_origin, angle_deg, my_ships, grid_size
                                         angle_deg, BEAM_HALF_WIDTH)
 
             delay = distance_to_delay(dist, round_trip=False)
-            amp = attenuate(SONAR_AMPLITUDE * 0.8 * lobe_gain, dist)
+            # Direct arrival: one-way from the enemy transducer to us.
+            # Full sonar amplitude × lobe gain (no arbitrary dampening).
+            amp = attenuate(SONAR_AMPLITUDE * lobe_gain, dist)
 
             if not has_contact or amp > contact_amp:
                 has_contact = True
