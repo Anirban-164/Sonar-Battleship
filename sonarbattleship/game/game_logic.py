@@ -209,6 +209,9 @@ def dsp_sonar(origin_row, origin_col, angle_degrees, enemy_player,
         'cells': s.cells, 'hit_cells': s.hit_cells, 'is_sunk': s.is_sunk,
     } for s in Ship.objects.filter(player=enemy_player)]
 
+    # deterministic seed so the UI can replay the exact same waveform
+    noise_seed = random.randint(1, 999_999)
+
     # generate the raw signal (physics sim — echo is buried in noise)
     raw_signals = generate_sonar_echo(
         origin,
@@ -216,7 +219,8 @@ def dsp_sonar(origin_row, origin_col, angle_degrees, enemy_player,
         my_ships,
         enemy_ships,
         grid_size,
-        my_position
+        my_position,
+        seed=noise_seed,
     )
 
     # Which hydrophone do we read? The one on the boat that actually
@@ -250,6 +254,7 @@ def dsp_sonar(origin_row, origin_col, angle_degrees, enemy_player,
         'confidence': dsp_result['confidence'],
         'snr': dsp_result['snr'],
         'dsp_driven': True,
+        'noise_seed': noise_seed,
     }
 
     # The ping bounced off one of our own boats — the beam never reached

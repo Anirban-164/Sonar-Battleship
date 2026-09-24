@@ -437,16 +437,16 @@ def api_action(request, room_code):
 
         result = dsp_sonar(origin_row, origin_col, angle, enemy, me, room.grid_size, my_position)
 
-        # Active sonar gives away the boat that used it. Work out what the
-        # opponent's hydrophones make of the transmission and file it with
-        # the action — strip_private_action_fields() below keeps it out of
-        # the pinging player's own view, because a real submarine has no
-        # way of knowing whether anyone was listening.
-        enemy_position = get_player_position(room, enemy)
-        result['counter_detection'] = counter_detect(
-            [origin_row, origin_col], angle, enemy,
-            room.grid_size, enemy_position,
-        )
+        # Active sonar gives away the boat that used it. But if a friendly
+        # hull blocked the beam, the pulse never left our fleet.
+        if result.get('blocked'):
+            result['counter_detection'] = {'detected': False, 'hydrophones': 0}
+        else:
+            enemy_position = get_player_position(room, enemy)
+            result['counter_detection'] = counter_detect(
+                [origin_row, origin_col], angle, enemy,
+                room.grid_size, enemy_position,
+            )
 
         Action.objects.create(
             room=room, player=me, action_type='sonar',
@@ -459,6 +459,7 @@ def api_action(request, room_code):
         if not (0 <= target_row < room.grid_size and 0 <= target_col < room.grid_size):
             return JsonResponse({'error': 'Target out of bounds'}, status=400)
         result = process_fire(target_row, target_col, enemy)
+        result['noise_seed'] = random.randint(1, 999_999)
         Action.objects.create(
             room=room, player=me, action_type='fire',
             target_row=target_row, target_col=target_col,
@@ -550,11 +551,14 @@ def api_signals(request, room_code):
                 origin_result = latest_action.result or {}
                 origin = origin_result.get('origin', [latest_action.target_row, 0])
                 angle = latest_action.target_col
+                # replay with the same noise seed so the graph matches the table
+                noise_seed = origin_result.get('noise_seed')
 
                 signals = generate_sonar_echo(
                     origin, angle,
                     my_ships, enemy_ships,
-                    room.grid_size, my_position
+                    room.grid_size, my_position,
+                    seed=noise_seed,
                 )
 
                 # figure out which ship index fired the sonar
@@ -578,23 +582,29 @@ def api_signals(request, room_code):
                 signals = generate_bomb_shockwave_signals(
                     (latest_action.target_row, latest_action.target_col),
                     my_ships, room.grid_size, my_position,
-                    target_side='enemy',          # I aimed at their grid
+                    target_side='enemy',
                     hit=was_hit,
                     hit_ship_size=fire_result.get('ship_size'),
+                    seed=fire_result.get('noise_seed'),
                 )
         else:
             # enemy did something
             if latest_action.action_type == 'sonar':
-                # enemy sonar ping passes near my ships
-                event_type = 'incoming_sonar'
                 origin_result = latest_action.result or {}
-                enemy_origin = origin_result.get('origin', [0, 0])
-                angle = latest_action.target_col
 
-                signals = generate_incoming_sonar_signals(
-                    enemy_origin, angle,
-                    my_ships, room.grid_size, my_position
-                )
+                # if the enemy's own hull blocked their ping, it never reached us
+                if origin_result.get('blocked'):
+                    signals = generate_idle_signals(len(my_ships))
+                else:
+                    event_type = 'incoming_sonar'
+                    enemy_origin = origin_result.get('origin', [0, 0])
+                    angle = latest_action.target_col
+
+                    signals = generate_incoming_sonar_signals(
+                        enemy_origin, angle,
+                        my_ships, room.grid_size, my_position,
+                        seed=origin_result.get('noise_seed'),
+                    )
             elif latest_action.action_type == 'fire':
                 # Enemy bomb — it landed on MY grid, so the blast is in my
                 # own coordinate frame. Passing target_side='mine' is what
@@ -609,6 +619,7 @@ def api_signals(request, room_code):
                     target_side='mine',
                     hit=was_hit,
                     hit_ship_size=fire_result.get('ship_size'),
+                    seed=fire_result.get('noise_seed'),
                 )
     else:
         # nothing new, just ocean noise
