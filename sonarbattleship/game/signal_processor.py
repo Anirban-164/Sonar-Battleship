@@ -2,7 +2,7 @@ import numpy as np
 
 from game.signal_engine import (
     SAMPLE_RATE, NUM_SAMPLES, SIGNAL_DURATION,
-    SONAR_FREQ, SONAR_SIGMA, SONAR_AMPLITUDE,
+    SONAR_FREQ, SONAR_SIGMA, SONAR_AMPLITUDE, ECHO_GAIN,
     BOMB_FREQ, BOMB_SIGMA, BOMB_AMPLITUDE,
     HULL_FREQ, HULL_SIGMA, HULL_AMPLITUDE, HULL_RING_LAG,
     NOISE_LEVEL, DELAY_PER_CELL, ATTENUATION_ALPHA,
@@ -443,7 +443,7 @@ def process_signal(raw_signal):
         est_dist_direct = delay_to_distance(sonar['delay'], round_trip=False)
         est_dist = est_dist_echo
         est_size = estimate_target_size(sonar['amplitude'], est_dist_echo,
-                                        source_amplitude=SONAR_AMPLITUDE)
+                                        source_amplitude=SONAR_AMPLITUDE * ECHO_GAIN)
     else:
         # Nothing cleared the bar. Show the sonar channel by default, and
         # still report the confidence we actually measured rather than a

@@ -21,6 +21,7 @@ PULSE_ORIGIN_OFFSET = 0.30
 SONAR_FREQ = 5.0 # carrier
 SONAR_SIGMA = 0.08 # Gaussian width (sec)
 SONAR_AMPLITUDE = 1.0 # Peak amplitude (b4 attenuation)
+ECHO_GAIN = 1.4 # active sonar advantage --> sender correlates a known waveform, passive listener doesn't
 PULSE_TUNING = 0.12 # increase in the pulse's width for every extra cell of submarine length
 
 # fire shockwave (the blast itself — low, broad, no fine structure)
@@ -89,7 +90,6 @@ BOMB_BLAST_RADIUS = 1.0  # cells
 # aimed at them about 94% of the time but can only turn it into a full
 # bearing fix about half the time; a ping 60 degrees off their bearing is
 # heard about one time in five, and one aimed away is not heard at all.
-SIDE_LOBE_LEVEL = 0.90          # level immediately outside the main lobe
 SIDE_LOBE_FALLOFF_DEG = 45.0    # degrees for the side lobes to fall by 1/e
 
 
@@ -157,10 +157,13 @@ def distance_to_delay(dist, round_trip = True):
     return round_trip_delay if round_trip else 0.5 * round_trip_delay
 
 
-def generate_ocean_noise(num_samples = NUM_SAMPLES):
+def generate_ocean_noise(num_samples = NUM_SAMPLES, rng = None):
     """
     Generate pure ocean ambient noise (AWGN)
+    - if rng is provided, uses it for deterministic output
     """
+    if rng is not None:
+        return rng.normal(0, NOISE_LEVEL, num_samples)
     return np.random.normal(0, NOISE_LEVEL, num_samples)
 
 
@@ -208,7 +211,7 @@ def transducer_gain(origin, target, angle, half_width=BEAM_HALF_WIDTH):
         return 1.0
 
     expo = -(offset - half_width) / SIDE_LOBE_FALLOFF_DEG
-    return SIDE_LOBE_LEVEL * math.exp(expo)
+    return math.exp(expo)
 
 
 def _enemy_col_offset(grid_size, side):
@@ -262,15 +265,17 @@ def find_beam_blocker(origin, angle_deg, my_ships, max_range = None):
     return blocker_dist, blocker_size
 
 
-def generate_sonar_echo(origin, angle_deg, my_ships, enemy_ships, grid_size, side = 'left'):
+def generate_sonar_echo(origin, angle_deg, my_ships, enemy_ships, grid_size, side = 'left', seed = None):
     """
     Generates echo signals received by our ships after firing a sonar ping.
     Possible outcomes:
     - Friendly hull blocks the beam --> return --> no enemy data
     - Enemy hull in the beam --> contact --> amplitude and width depend on target size
     - Empty water --> ocean noise
+    - seed makes the noise deterministic so the table and graph always agree
     """
     t = time_axis()
+    rng = np.random.default_rng(seed) if seed is not None else None
     ori_r, ori_c = origin
     col_offset = _enemy_col_offset(grid_size, side)
 
@@ -340,7 +345,7 @@ def generate_sonar_echo(origin, angle_deg, my_ships, enemy_ships, grid_size, sid
         if dist_to_source == np.inf:
             dist_to_source = 0.0
 
-        signal = generate_ocean_noise(len(t))
+        signal = generate_ocean_noise(len(t), rng=rng)
         delay = None
         amp = None
 
@@ -348,7 +353,8 @@ def generate_sonar_echo(origin, angle_deg, my_ships, enemy_ships, grid_size, sid
             delay = distance_to_delay(echo_dist, round_trip=True)
             
             # echo decays twice: once going to the target, once coming back to the listener
-            base_amp = attenuate(SONAR_AMPLITUDE * target_strength(echo_size), echo_dist)
+            # ECHO_GAIN compensates for the round-trip loss and models the active sonar advantage
+            base_amp = attenuate(SONAR_AMPLITUDE * ECHO_GAIN * target_strength(echo_size), echo_dist)
 
             listener_decay = attenuate(1.0, dist_to_source)
             amp = base_amp * listener_decay
@@ -376,7 +382,7 @@ def generate_sonar_echo(origin, angle_deg, my_ships, enemy_ships, grid_size, sid
 # ============================================================
 # Scenario 2: Enemy Sonar passes near our ships
 # ============================================================
-def generate_incoming_sonar_signals(enemy_origin, angle_deg, my_ships, grid_size, my_position = 'left'):
+def generate_incoming_sonar_signals(enemy_origin, angle_deg, my_ships, grid_size, my_position = 'left', seed = None):
     """
     Simulates receiving an enemy's sonar ping.
     - direct, one-way
@@ -386,10 +392,11 @@ def generate_incoming_sonar_signals(enemy_origin, angle_deg, my_ships, grid_size
     enemy_r, enemy_c = enemy_origin
     col_offset = -grid_size if my_position == 'left' else grid_size
     origin_pt = (enemy_r, enemy_c)
+    rng = np.random.default_rng(seed) if seed is not None else None
 
     result = {}
     for idx, ship in enumerate(my_ships):
-        signal = generate_ocean_noise(len(t))
+        signal = generate_ocean_noise(len(t), rng=rng)
         detected = False
         contact_delay = None
         contact_amp = None
@@ -442,7 +449,7 @@ def generate_incoming_sonar_signals(enemy_origin, angle_deg, my_ships, grid_size
 # Scenario 3: Fire/Bomb Shockwave
 # ============================================================
 
-def generate_bomb_shockwave_signals(bomb_coord, my_ships, grid_size, my_position = 'left', target_side = 'enemy', hit = False, hit_ship_size = None):
+def generate_bomb_shockwave_signals(bomb_coord, my_ships, grid_size, my_position = 'left', target_side = 'enemy', hit = False, hit_ship_size = None, seed = None):
     """
     Generates acoustic signals for a bomb explosion.
     - MISS --> low-frequency shockwave
@@ -457,10 +464,11 @@ def generate_bomb_shockwave_signals(bomb_coord, my_ships, grid_size, my_position
     else:
         col_offset = -grid_size if my_position == 'left' else grid_size
     ring_size = hit_ship_size or REFERENCE_SHIP_SIZE
+    rng = np.random.default_rng(seed) if seed is not None else None
 
     result = {}
     for idx, ship in enumerate(my_ships):
-        signal = generate_ocean_noise(len(t))
+        signal = generate_ocean_noise(len(t), rng=rng)
         heard_shockwave = False
         shock_delay = None
         shock_amp = None
