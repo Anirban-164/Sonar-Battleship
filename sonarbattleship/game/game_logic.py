@@ -17,7 +17,7 @@ from game.signal_engine import (
     find_beam_blocker,
     BEAM_HALF_WIDTH,
 )
-from game.signal_processor import process_signal
+from game.signal_processor import processSignal
 
 
 # ============================================================
@@ -246,7 +246,7 @@ def dsp_sonar(origin_row, origin_col, angle_degrees, enemy_player,
     echo_meta = raw_signals[best_ship_idx]
 
     # run the DSP pipeline
-    dsp_result = process_signal(origin_signal)
+    dsp_result = processSignal(origin_signal)
 
     base = {
         'bearing': angle_degrees,
@@ -394,7 +394,7 @@ def counter_detect_from_ships(enemy_origin, angle_degrees, my_ships, grid_size,
 
     for idx, data in incoming.items():
         ship = my_ships[idx]
-        out = process_signal(data['signal'])
+        out = processSignal(data['signal'])
 
         if not (out['detected'] and out['signal_type'] == 'sonar'):
             continue
