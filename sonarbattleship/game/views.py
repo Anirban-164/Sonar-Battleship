@@ -442,10 +442,15 @@ def api_action(request, room_code):
         if result.get('blocked'):
             result['counter_detection'] = {'detected': False, 'hydrophones': 0}
         else:
+            # Separate seed for the incoming signal so the defender's
+            # passive table and graph see the same noise.
+            incoming_seed = random.randint(1, 999_999)
+            result['incoming_noise_seed'] = incoming_seed
             enemy_position = get_player_position(room, enemy)
             result['counter_detection'] = counter_detect(
                 [origin_row, origin_col], angle, enemy,
                 room.grid_size, enemy_position,
+                seed=incoming_seed,
             )
 
         Action.objects.create(
@@ -603,7 +608,7 @@ def api_signals(request, room_code):
                     signals = generate_incoming_sonar_signals(
                         enemy_origin, angle,
                         my_ships, room.grid_size, my_position,
-                        seed=origin_result.get('noise_seed'),
+                        seed=origin_result.get('incoming_noise_seed'),
                     )
             elif latest_action.action_type == 'fire':
                 # Enemy bomb — it landed on MY grid, so the blast is in my
@@ -663,15 +668,33 @@ def api_signals(request, room_code):
         if event_type == 'incoming_sonar':
             distance = processed['estimated_distance_direct']
 
-        # --- Fix: only the ORIGIN ship reports a sonar echo detection ---
-        # All ships hear the echo (signal_engine puts it on every
-        # hydrophone attenuated by distance), but non-origin ships
-        # shouldn't claim they "detected" something — only the ship
-        # that actually fired the ping reads the return.
+        # --- Context correction: the DSP is event-blind, but we know ---
+        # The matched-filter bank runs all three channels on every
+        # recording. When a sonar ping misses (pure noise), a lucky
+        # noise peak in the bomb band can beat the sonar band and the
+        # classifier calls it 'bomb_miss'. Similarly, a weak bomb at
+        # cross-grid distance can lose to a noise peak in the sonar
+        # band. We know the event type, so clamp the classification.
         ship_detected = processed['detected']
         ship_signal_type = processed['signal_type']
-        if event_type == 'sonar_echo' and _origin_ship_idx is not None:
-            if idx_int != _origin_ship_idx:
+
+        if event_type == 'sonar_echo':
+            # Only sonar-class detections are valid for an echo event.
+            if ship_signal_type not in ('sonar', 'unknown'):
+                ship_detected = False
+                ship_signal_type = 'unknown'
+            # Only the ORIGIN ship reports a sonar echo detection.
+            if _origin_ship_idx is not None and idx_int != _origin_ship_idx:
+                ship_detected = False
+                ship_signal_type = 'unknown'
+        elif event_type == 'incoming_sonar':
+            # An enemy ping is in the sonar band; bomb readings are noise.
+            if ship_signal_type not in ('sonar', 'unknown'):
+                ship_detected = False
+                ship_signal_type = 'unknown'
+        elif event_type in ('bomb_hit', 'bomb_miss'):
+            # Only bomb-class detections are valid for a blast event.
+            if ship_signal_type not in ('bomb_hit', 'bomb_miss', 'unknown'):
                 ship_detected = False
                 ship_signal_type = 'unknown'
 

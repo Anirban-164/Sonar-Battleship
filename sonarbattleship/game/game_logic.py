@@ -17,7 +17,7 @@ from game.signal_engine import (
     find_beam_blocker,
     BEAM_HALF_WIDTH,
 )
-from game.signal_processor import processSignal
+from game.signal_processor import processSignal, SNR_DETECTION_THRESHOLD
 
 
 # ============================================================
@@ -345,7 +345,7 @@ def _multilaterate(receivers, grid_size, source_position):
 
 
 def counter_detect(enemy_origin, angle_degrees, listener, grid_size,
-                   listener_position):
+                   listener_position, seed=None):
     """
     Work out what the player being pinged hears.
 
@@ -369,12 +369,13 @@ def counter_detect(enemy_origin, angle_degrees, listener, grid_size,
     } for s in Ship.objects.filter(player=listener, is_sunk=False)]
 
     return counter_detect_from_ships(
-        enemy_origin, angle_degrees, my_ships, grid_size, listener_position
+        enemy_origin, angle_degrees, my_ships, grid_size, listener_position,
+        seed=seed,
     )
 
 
 def counter_detect_from_ships(enemy_origin, angle_degrees, my_ships, grid_size,
-                              listener_position):
+                              listener_position, seed=None):
     """
     The database-free half of counter_detect(), so the acoustics can be
     exercised without a Django connection (see game/dsp_harness.py).
@@ -385,7 +386,8 @@ def counter_detect_from_ships(enemy_origin, angle_degrees, my_ships, grid_size,
     # The same pulse the attacker transmitted, as it reaches each of our
     # boats — noise, attenuation and all.
     incoming = generate_incoming_sonar_signals(
-        enemy_origin, angle_degrees, my_ships, grid_size, listener_position
+        enemy_origin, angle_degrees, my_ships, grid_size, listener_position,
+        seed=seed,
     )
 
     receivers = []       # [(unified position, measured range)]
@@ -396,8 +398,20 @@ def counter_detect_from_ships(enemy_origin, angle_degrees, my_ships, grid_size,
         ship = my_ships[idx]
         out = processSignal(data['signal'])
 
-        if not (out['detected'] and out['signal_type'] == 'sonar'):
+        # We know this signal IS an incoming sonar ping.  Accept any
+        # detection whose sonar channel cleared the bar — the classifier
+        # can occasionally mislabel a ping as 'bomb_miss' when noise in
+        # the low band happens to have a tall peak, but the sonar
+        # channel's SNR is what matters for ranging.
+        if not out['detected']:
             continue
+        # If the DSP classified as bomb, double-check the sonar channel.
+        # A real ping always has sonar-band energy; if that channel also
+        # cleared threshold, trust it for ranging.
+        if out['signal_type'] != 'sonar':
+            sonar_snr = out.get('channels', {}).get('sonar', {}).get('snr', 0)
+            if sonar_snr < SNR_DETECTION_THRESHOLD:
+                continue
 
         # The enemy's ping is a DIRECT arrival, not an echo off something,
         # so the one-way reading is the correct hypothesis here.
