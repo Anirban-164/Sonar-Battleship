@@ -52,7 +52,7 @@ types = {}
 TRIALS = 400
 for _ in range(TRIALS):
     sig = se.generate_idle_signals(1)[0]['signal']
-    out = sp.process_signal(sig)
+    out = sp.processSignal(sig)
     if out['detected']:
         false_alarms += 1
         types[out['signal_type']] = types.get(out['signal_type'], 0) + 1
@@ -61,7 +61,7 @@ print(f'false alarms: {false_alarms}/{TRIALS}  ({100*false_alarms/TRIALS:.1f}%) 
 confs = []
 for _ in range(200):
     sig = se.generate_idle_signals(1)[0]['signal']
-    confs.append(sp.process_signal(sig)['confidence'])
+    confs.append(sp.processSignal(sig)['confidence'])
 print(f'idle confidence: mean {statistics.mean(confs):.3f}  max {max(confs):.3f}')
 
 
@@ -80,7 +80,7 @@ for size in (3, 4, 5):
         ang = bearing(origin, tgt_unified)
         sigs = se.generate_sonar_echo(origin, ang, me, [target], GRID, 'left')
         truth = sigs[0]['target_distance']
-        out = sp.process_signal(sigs[0]['signal'])
+        out = sp.processSignal(sigs[0]['signal'])
         confs.append(out['confidence'])
         if out['detected']:
             det += 1
@@ -151,7 +151,7 @@ for label, is_hit, hit_size in (('miss', False, None), ('hit-3', True, 3),
         sigs = se.generate_bomb_shockwave_signals(
             (5, 5), my_ships, GRID, 'left', target_side='enemy',
             hit=is_hit, hit_ship_size=hit_size)
-        out = sp.process_signal(sigs[0]['signal'])
+        out = sp.processSignal(sigs[0]['signal'])
         counts[out['signal_type']] = counts.get(out['signal_type'], 0) + 1
         if is_hit and out['estimated_size'] is not None:
             sizes.append(out['estimated_size'])
@@ -206,7 +206,7 @@ for noise in (0.05, 0.10, 0.15, 0.25, 0.40, 0.70):
     for _ in range(150):
         sigs = se.generate_sonar_echo(origin, ang, me1, target, GRID, 'left')
         truth = sigs[0]['target_distance']
-        out = sp.process_signal(sigs[0]['signal'])
+        out = sp.processSignal(sigs[0]['signal'])
         confs.append(out['confidence'])
         if not (0.0 <= out['confidence'] <= 1.0):
             out_of_range += 1
@@ -236,7 +236,7 @@ _mod = _types.ModuleType('counter_pure')
 _mod.__dict__.update({
     'math': __import__('math'),
     'generate_incoming_sonar_signals': se.generate_incoming_sonar_signals,
-    'process_signal': sp.process_signal,
+    'process_signal': sp.processSignal,
 })
 exec(compile(_src[_start:_end], 'game_logic.py(pure)', 'exec'), _mod.__dict__)
 counter_detect_from_ships = _mod.counter_detect_from_ships
