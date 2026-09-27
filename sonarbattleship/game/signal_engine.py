@@ -394,12 +394,18 @@ def generate_incoming_sonar_signals(enemy_origin, angle_deg, my_ships, grid_size
     origin_pt = (enemy_r, enemy_c)
     rng = np.random.default_rng(seed) if seed is not None else None
 
+    # amplitude floor: if the received signal would be weaker than this,
+    # don't bother adding it — it's buried so far below the noise that
+    # the DSP shouldn't be picking it up. Without this, every ship in
+    # the fleet gets a tiny pulse and the detector false-triggers on
+    # ships that are nowhere near the beam.
+    amp_floor = NOISE_LEVEL * 2.0
+
     result = {}
     for idx, ship in enumerate(my_ships):
         signal = generate_ocean_noise(len(t), rng=rng)
-        detected = False
-        contact_delay = None
-        contact_amp = None
+        best_amp = 0.0
+        best_delay = None
         in_beam = False
 
         for cell in ship.get('cells', []):
@@ -417,24 +423,29 @@ def generate_incoming_sonar_signals(enemy_origin, angle_deg, my_ships, grid_size
             delay = distance_to_delay(dist, round_trip=False)
             amp = attenuate(SONAR_AMPLITUDE * lobe_gain, dist)
 
-            if not detected or amp > contact_amp:
-                detected = True
-                contact_delay = delay
-                contact_amp = amp
+            if amp > best_amp:
+                best_amp = amp
+                best_delay = delay
                 in_beam = in_main_lobe
 
-        if detected and contact_delay is not None:
-            pulse_time = PULSE_ORIGIN_OFFSET + contact_delay
+        # only inject a pulse if the amplitude actually stands above the noise —
+        # otherwise the ship genuinely can't hear it and shouldn't detect anything
+        detected = best_amp >= amp_floor and best_delay is not None
+
+        if detected:
+            pulse_time = PULSE_ORIGIN_OFFSET + best_delay
             if pulse_time < SIGNAL_DURATION:
-                ping_pulse = gaussian_ping(t, SONAR_FREQ, SONAR_SIGMA, contact_amp, pulse_time)
+                ping_pulse = gaussian_ping(t, SONAR_FREQ, SONAR_SIGMA, best_amp, pulse_time)
                 signal += ping_pulse
+            else:
+                detected = False
 
         result[idx] = {
             'signal': signal.tolist(),
             'time': t.tolist(),
             'has_echo': detected,
-            'echo_delay': float(contact_delay) if contact_delay is not None else None,
-            'echo_amplitude': float(contact_amp) if contact_amp is not None else None,
+            'echo_delay': float(best_delay) if best_delay is not None else None,
+            'echo_amplitude': float(best_amp) if best_amp > 0 else None,
             'in_main_lobe': bool(in_beam),
             'blocked': False,
             'blocked_by_size': None,
