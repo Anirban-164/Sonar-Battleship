@@ -382,17 +382,106 @@ def generate_sonar_echo(origin, angle_deg, my_ships, enemy_ships, grid_size, sid
 # ============================================================
 # Scenario 2: Enemy Sonar passes near our ships
 # ============================================================
+def _find_incoming_blocker(enemy_origin, listener_cell, listener_dist, my_ships, listener_idx):
+    """
+    Check whether any friendly hull sits between the enemy transmitter and
+    the listener, casting an acoustic shadow.
+
+    The test is: for every cell of every *other* friendly ship, compute
+    (a) whether it lies on roughly the same bearing from the enemy as the
+    listener, and (b) whether it is closer to the enemy.  If both are true,
+    that hull blocks the direct path.
+
+    Returns (blocker_dist, blocker_size) or (None, None).
+    """
+    er, ec = enemy_origin
+    lr, lc = listener_cell
+
+    # Bearing from the enemy origin to the listener
+    dr_l = lr - er
+    dc_l = lc - ec
+    if abs(dr_l) < 1e-9 and abs(dc_l) < 1e-9:
+        return None, None
+    listener_bearing = math.degrees(math.atan2(dc_l, -dr_l))
+    if listener_bearing < 0:
+        listener_bearing += 360
+
+    blocker_dist = None
+    blocker_size = None
+
+    for jdx, other in enumerate(my_ships):
+        if jdx == listener_idx:
+            continue
+        if other.get('is_sunk', False):
+            continue
+
+        cells = other.get('cells', [])
+        actual_size = int(other.get('size', len(cells)) or len(cells))
+
+        for cell in cells:
+            cr, cc = cell[0], cell[1]
+            dr = cr - er
+            dc = cc - ec
+            dist = math.sqrt(dr ** 2 + dc ** 2)
+
+            if dist < 1e-6 or dist >= listener_dist:
+                continue
+
+            # Bearing from the enemy to this candidate blocker cell
+            cell_bearing = math.degrees(math.atan2(dc, -dr))
+            if cell_bearing < 0:
+                cell_bearing += 360
+
+            diff = abs(cell_bearing - listener_bearing) % 360
+            if diff > 180:
+                diff = 360 - diff
+
+            if diff <= BEAM_HALF_WIDTH:
+                if blocker_dist is None or dist < blocker_dist:
+                    blocker_dist = dist
+                    blocker_size = actual_size
+
+    return blocker_dist, blocker_size
+
+
 def generate_incoming_sonar_signals(enemy_origin, angle_deg, my_ships, grid_size, my_position = 'left', seed = None):
     """
     Simulates receiving an enemy's sonar ping.
     - direct, one-way
     - closer ships get a stronger signal
+    - a friendly hull between the transmitter and a listener shadows
+      the listener (the signal cannot penetrate a hull)
     """
     t = time_axis()
     enemy_r, enemy_c = enemy_origin
     col_offset = -grid_size if my_position == 'left' else grid_size
     origin_pt = (enemy_r, enemy_c)
     rng = np.random.default_rng(seed) if seed is not None else None
+
+    # Pre-compute each ship's representative position and distance from the
+    # enemy, in the unified coordinate space, so the shadow test can compare
+    # ships cheaply.
+    ship_unified = []   # [(mid_row, mid_shifted_col, dist_to_enemy)]
+    for ship in my_ships:
+        cells = ship.get('cells', [])
+        mid = cells[len(cells) // 2]
+        shifted_col = mid[1] + col_offset
+        dr = mid[0] - enemy_r
+        dc = shifted_col - enemy_c
+        dist = math.sqrt(dr ** 2 + dc ** 2)
+        ship_unified.append((mid[0], shifted_col, dist))
+
+    # Build unified-space ship dicts for the blocker check — the blocker
+    # function works in the same coordinate space as enemy_origin.
+    unified_ships = []
+    for ship in my_ships:
+        cells_shifted = [[c[0], c[1] + col_offset] for c in ship.get('cells', [])]
+        unified_ships.append({
+            'size': ship.get('size', len(ship.get('cells', []))),
+            'cells': cells_shifted,
+            'hit_cells': ship.get('hit_cells', []),
+            'is_sunk': ship.get('is_sunk', False),
+        })
 
     result = {}
     for idx, ship in enumerate(my_ships):
@@ -402,26 +491,36 @@ def generate_incoming_sonar_signals(enemy_origin, angle_deg, my_ships, grid_size
         contact_amp = None
         in_beam = False
 
-        for cell in ship.get('cells', []):
-            cr, cc = cell[0], cell[1]
-            shifted_col = cc + col_offset
-            
-            dr = cr - enemy_r
-            dc = shifted_col - enemy_c
-            dist = math.sqrt(dr ** 2 + dc ** 2)
+        # --- Shadow check ---
+        # Does any other friendly hull sit between the enemy and this
+        # listener on roughly the same bearing?
+        mid_r, mid_c, listener_dist = ship_unified[idx]
+        shadow_dist, shadow_size = _find_incoming_blocker(
+            origin_pt, (mid_r, mid_c), listener_dist, unified_ships, idx
+        )
+        is_shadowed = shadow_dist is not None
 
-            # check if this part of the sub is inside the main sonar cone
-            in_main_lobe = _in_beam(origin_pt, (cr, shifted_col), angle_deg)
-            lobe_gain = transducer_gain(origin_pt, (cr, shifted_col), angle_deg)
+        if not is_shadowed:
+            for cell in ship.get('cells', []):
+                cr, cc = cell[0], cell[1]
+                shifted_col = cc + col_offset
 
-            delay = distance_to_delay(dist, round_trip=False)
-            amp = attenuate(SONAR_AMPLITUDE * lobe_gain, dist)
+                dr = cr - enemy_r
+                dc = shifted_col - enemy_c
+                dist = math.sqrt(dr ** 2 + dc ** 2)
 
-            if not detected or amp > contact_amp:
-                detected = True
-                contact_delay = delay
-                contact_amp = amp
-                in_beam = in_main_lobe
+                # check if this part of the sub is inside the main sonar cone
+                in_main_lobe = _in_beam(origin_pt, (cr, shifted_col), angle_deg)
+                lobe_gain = transducer_gain(origin_pt, (cr, shifted_col), angle_deg)
+
+                delay = distance_to_delay(dist, round_trip=False)
+                amp = attenuate(SONAR_AMPLITUDE * lobe_gain, dist)
+
+                if not detected or amp > contact_amp:
+                    detected = True
+                    contact_delay = delay
+                    contact_amp = amp
+                    in_beam = in_main_lobe
 
         if detected and contact_delay is not None:
             pulse_time = PULSE_ORIGIN_OFFSET + contact_delay

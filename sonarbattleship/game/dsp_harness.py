@@ -237,6 +237,7 @@ _mod.__dict__.update({
     'math': __import__('math'),
     'generate_incoming_sonar_signals': se.generate_incoming_sonar_signals,
     'process_signal': sp.process_signal,
+    'SNR_DETECTION_THRESHOLD': sp.SNR_DETECTION_THRESHOLD,
 })
 exec(compile(_src[_start:_end], 'game_logic.py(pure)', 'exec'), _mod.__dict__)
 counter_detect_from_ships = _mod.counter_detect_from_ships
