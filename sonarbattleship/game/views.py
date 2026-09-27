@@ -100,6 +100,11 @@ def home(request):
     return render(request, 'game/home.html')
 
 
+def how_to_play(request):
+    """How to play instructions page."""
+    return render(request, 'game/how_to_play.html')
+
+
 def room(request, room_code):
     """Main game page for a specific room."""
     room_obj = get_object_or_404(Room, code=room_code.upper())

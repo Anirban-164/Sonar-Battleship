@@ -1,0 +1,159 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>How to Play — Sonar Battleship</title>
+  <meta name="description"
+    content="Learn how to play Sonar Battleship.">
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+
+  <!-- Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+
+  <!-- Theme CSS -->
+  <link href="{% static 'game/sonar-landing.css' %}" rel="stylesheet">
+  <style>
+    .how-to-play-content {
+      padding: 100px 0;
+      min-height: calc(100vh - 76px - 100px);
+    }
+    .how-to-play-content p, .how-to-play-content ul, .how-to-play-content li {
+        color: var(--ink-1);
+    }
+    .how-to-play-content strong {
+        color: var(--green-soft);
+    }
+    .how-to-play-content h3 {
+        color: var(--green);
+        margin-top: 30px;
+        margin-bottom: 15px;
+        font-family: var(--f-display);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+    }
+    .how-to-play-content ul {
+        list-style-type: disc;
+        margin-left: 20px;
+        margin-bottom: 20px;
+    }
+    .how-to-play-content li {
+        margin-bottom: 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <header class="site-header">
+    <div class="container site-header__inner">
+      <a href="{% url 'game:home' %}" class="brand">
+        <svg class="brand__mark" viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="17" cy="17" r="15.3" stroke="currentColor" stroke-width="1.3" opacity="0.45" />
+          <circle cx="17" cy="17" r="10.4" stroke="currentColor" stroke-width="1.3" opacity="0.7" />
+          <circle cx="17" cy="17" r="5.4" stroke="currentColor" stroke-width="1.3" />
+          <circle cx="17" cy="17" r="2" fill="currentColor" />
+          <path d="M17 17 L27.5 8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
+        <span class="brand__word">SONAR <span>BATTLESHIP</span></span>
+      </a>
+
+      <nav class="nav" id="nav">
+        <ul class="nav__list">
+          <li><a href="{% url 'game:home' %}">Home</a></li>
+          <li><a href="{% url 'game:how_to_play' %}" class="active">How to Play</a></li>
+        </ul>
+      </nav>
+
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation" aria-expanded="false"
+        aria-controls="nav">
+        <i class="bi bi-list"></i>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <section class="how-to-play-content abyss">
+        <div class="depth-lines"></div>
+        <div class="container" style="position: relative; z-index: 1;">
+            <div class="section-head" data-reveal>
+                <span class="section-eyebrow">Manual</span>
+                <h2>How to Play</h2>
+                <p>Learn the mechanics of Sonar Battleship.</p>
+            </div>
+            
+            <div class="pipeline-row" style="display: block;" data-reveal>
+                <div class="pcard" style="margin-bottom: 20px;">
+                    <h3>The Basics</h3>
+                    <p>Sonar Battleship is a turn-based multiplayer naval warfare game where finding the enemy relies on real signal processing mechanics instead of blind coordinate guessing.</p>
+                </div>
+
+                <div class="pcard" style="margin-bottom: 20px;">
+                    <h3>Placement Phase</h3>
+                    <p>Before the action begins, you must place your fleet of submarines on the grid. Each ship spans multiple cells, so an enemy contact narrows down where the rest of the hull is hiding.</p>
+                </div>
+
+                <div class="pcard" style="margin-bottom: 20px;">
+                    <h3>Action Phase</h3>
+                    <p>Each turn, you must choose to either use <strong>Sonar</strong> or <strong>Fire</strong> a torpedo.</p>
+                    
+                    <h3>📡 Sonar</h3>
+                    <p>Transmit a pulse along a specific bearing to detect enemy ships. A Gaussian-windowed pulse fires toward the target.</p>
+                    <ul>
+                        <li>If it strikes an enemy ship, an echo returns to your hydrophones.</li>
+                        <li>The signal processor uses cross-correlation and a matched filter to pull the echo out of the noise.</li>
+                        <li><strong>Warning:</strong> Transmitting an active sonar ping reveals your location. The enemy's passive hydrophones can detect your bearing and estimate your range.</li>
+                    </ul>
+
+                    <h3>💥 Fire</h3>
+                    <p>Launch a torpedo at a specific coordinate. Since you only get distance and bearing estimates from sonar, firing often involves a degree of risk.</p>
+                    <ul>
+                        <li>If the torpedo hits, it damages the enemy ship.</li>
+                        <li>Both hits and misses create shockwaves that can be detected by hydrophones on both sides, providing additional clues.</li>
+                    </ul>
+                </div>
+
+                <div class="pcard">
+                    <h3>Winning the Game</h3>
+                    <p>Continue tracking contacts and exchanging fire. The first player to sink the entire enemy fleet wins the match.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+  </main>
+
+  <footer class="site-footer" id="footer">
+    <div class="container site-footer__inner">
+      <div class="footer-brand">
+        <svg viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="17" cy="17" r="15.3" stroke="currentColor" stroke-width="1.3" opacity="0.45" />
+          <circle cx="17" cy="17" r="10.4" stroke="currentColor" stroke-width="1.3" opacity="0.7" />
+          <circle cx="17" cy="17" r="5.4" stroke="currentColor" stroke-width="1.3" />
+          <circle cx="17" cy="17" r="2" fill="currentColor" />
+        </svg>
+        <span>Sonar Battleship</span>
+      </div>
+      <p class="footer-note">Built for CSE 220 — Signal Processing, as a two-person team project.</p>
+    </div>
+  </footer>
+
+  <script src="{% static 'game/sonar-landing.js' %}"></script>
+  <audio id="bgm" src="{% static 'game/audio/bgm.mp3' %}" loop></audio>
+  <script>
+    document.addEventListener('click', function() {
+        var bgm = document.getElementById('bgm');
+        if (bgm && bgm.paused) {
+            bgm.play().catch(function(e) { console.log("Audio play failed:", e); });
+        }
+    }, { once: true });
+  </script>
+</body>
+
+</html>

@@ -260,6 +260,7 @@
       <nav class="nav" id="nav">
         <ul class="nav__list">
           <li><a href="#top" class="active">Home</a></li>
+          <li><a href="{% url 'game:how_to_play' %}">How to Play</a></li>
           <li><a href="#features">Features</a></li>
           <li><a href="#pipeline">Technology</a></li>
           <li><a href="#footer">About</a></li>
@@ -704,6 +705,15 @@
     {% if error %}
     openRoomModal();
     {% endif %}
+  </script>
+  <audio id="bgm" src="{% static 'game/audio/bgm.mp3' %}" loop></audio>
+  <script>
+    document.addEventListener('click', function() {
+        var bgm = document.getElementById('bgm');
+        if (bgm && bgm.paused) {
+            bgm.play().catch(function(e) { console.log("Audio play failed:", e); });
+        }
+    }, { once: true });
   </script>
 </body>
 
