@@ -3,3 +3,4 @@ dj-database-url
 python-dotenv
 psycopg2-binary
 numpy
+whitenoise
