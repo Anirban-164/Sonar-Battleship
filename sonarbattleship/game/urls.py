@@ -6,6 +6,7 @@ app_name = 'game'
 urlpatterns = [
     # --- Page routes ---
     path('', views.home, name='home'),
+    path('how-to-play/', views.how_to_play, name='how_to_play'),
     path('room/<str:room_code>/', views.room, name='room'),
 
     # --- API routes (called by JS via fetch) ---
