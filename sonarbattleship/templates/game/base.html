@@ -25,6 +25,15 @@
     <div id="app">
         {% block content %}{% endblock %}
     </div>
+    <audio id="bgm" src="{% static 'game/audio/bgm.mp3' %}" loop></audio>
+    <script>
+        document.addEventListener('click', function() {
+            var bgm = document.getElementById('bgm');
+            if (bgm && bgm.paused) {
+                bgm.play().catch(function(e) { console.log("Audio play failed:", e); });
+            }
+        }, { once: true });
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

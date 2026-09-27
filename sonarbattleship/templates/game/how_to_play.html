@@ -145,6 +145,15 @@
   </footer>
 
   <script src="{% static 'game/sonar-landing.js' %}"></script>
+  <audio id="bgm" src="{% static 'game/audio/bgm.mp3' %}" loop></audio>
+  <script>
+    document.addEventListener('click', function() {
+        var bgm = document.getElementById('bgm');
+        if (bgm && bgm.paused) {
+            bgm.play().catch(function(e) { console.log("Audio play failed:", e); });
+        }
+    }, { once: true });
+  </script>
 </body>
 
 </html>
