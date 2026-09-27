@@ -11,7 +11,6 @@ from game.signal_engine import (
 )
 
 # ----- Detection thresholds -----
-#
 # The old code compared the raw matched-filter peak against a fixed
 # number (0.30). That could never be right for long: the peak height
 # depends on how loud the echo was, which depends on distance and on the
@@ -19,7 +18,6 @@ from game.signal_engine import (
 # below it while a close blast sat far above it. Worse, that same raw
 # peak was handed to the UI and multiplied by 100 to make a
 # "confidence %", which happily printed numbers well over 100%.
-#
 # What matters is how far the peak stands out of the noise around it. We
 # measure the noise floor from the correlation trace itself and work in a
 # signal-to-noise ratio, which is dimensionless and comparable across
@@ -45,7 +43,6 @@ CLASSIFICATION_MARGIN = 1.5
 BOMB_BAND = (0.5, 3.0)
 SONAR_BAND = (3.0, 8.0)
 HULL_BAND = (8.0, 17.0)
-
 # Sonar template bank. We do not know how big the thing out there is, so
 # we correlate against one template per plausible submarine size and let
 # the best match tell us. This is the "use the size of the submarine to
@@ -63,7 +60,7 @@ MAX_REPORTED_SIZE = 6
 _MIN_LAG_SAMPLE = int(round(PULSE_ORIGIN_OFFSET * SAMPLE_RATE))
 
 
-def bandpass_filter(signal, band, sample_rate=SAMPLE_RATE):
+def BandpassFilter(signal, band, sample_rate=SAMPLE_RATE):
     """FFT-based bandpass filter:
     1. FFT the signal to get frequency components
     2. Zero out everything outside the given range
@@ -72,16 +69,13 @@ def bandpass_filter(signal, band, sample_rate=SAMPLE_RATE):
     """
     N = len(signal)
     low_freq, high_freq = band
-
-    X = np.fft.rfft(signal)  # FFT the whole signal to get frequency components
+    X = np.fft.rfft(signal)  # FFT the whole signal
     freqs = np.fft.rfftfreq(N, d=1.0 / sample_rate)
-
-    # Keeping track of the frequencies in range
+    #Extracting the frequencies in range
     mask = np.zeros_like(freqs, dtype=float)
     in_band = (freqs >= low_freq) & (freqs <= high_freq)
     mask[in_band] = 1.0
-
-    # smooth edges of the mask to prevent abrupt changes
+    #Smooth edges of the mask to nullify abrupt changes
     taper_width = 5
     band_indices = np.where(in_band)[0]
     if len(band_indices) > 2 * taper_width:
@@ -89,30 +83,23 @@ def bandpass_filter(signal, band, sample_rate=SAMPLE_RATE):
             fade = 0.5 * (1 - np.cos(np.pi * i / taper_width))
             mask[band_indices[i]] = fade
             mask[band_indices[-(i + 1)]] = fade
-
-    # Apply the created mask and IFFT back
+    #Apply the created mask and IFFT
     X_filtered = X * mask
     filtered_signal = np.fft.irfft(X_filtered, n=N)
-
-    noise_component = signal - filtered_signal  # the noise part
-
-    spectrum = np.abs(X) / N  # magnitude spectrum
-
+    noise_component = signal - filtered_signal  #Noise part
+    spectrum = np.abs(X) / N  #Magnitude spectrum
     return filtered_signal, noise_component, spectrum
 
 
-def generate_template(signal_type='sonar', size=REFERENCE_SHIP_SIZE):
+def GenerateTemplate(signal_type='sonar', size=REFERENCE_SHIP_SIZE):
     """
     Full-length reference copy of the pulse we expect, centred at
-    PULSE_ORIGIN_OFFSET — the same place the generators in signal_engine
-    put theirs before adding travel delay.
-
+    PULSE_ORIGIN_OFFSET.
     Kept for plotting and for anything that wants to see the template on
     the same time axis as the signal. The detector itself uses the
     compact quadrature pair below.
     """
     t = time_axis()
-
     if signal_type == 'sonar':
         return gaussian_ping(t, SONAR_FREQ, size_pulse_width(size), 1.0,
                              center=PULSE_ORIGIN_OFFSET)
@@ -123,20 +110,17 @@ def generate_template(signal_type='sonar', size=REFERENCE_SHIP_SIZE):
                          center=PULSE_ORIGIN_OFFSET)
 
 
-def _compact_quadrature_template(freq, sigma):
+def CompactQuadratureTemplate(freq, sigma):
     """
     The pulse cropped to the few hundred milliseconds it actually
-    occupies, as a sine/cosine pair.
-
-    Two reasons it is built this way rather than as a full 600-sample
-    array with the pulse buried in it:
-
-    * Length. Correlating two 600-sample arrays leaves the ends of the
+    occupies, as a sine or cosine pair.
+    There are two reasons:
+    1.Length:-->Correlating two 600-sample arrays leaves the ends of the
       output with almost no overlap, so the trace tapers to nearly zero
       at both edges. Any robust noise estimate taken over that trace is
       then dominated by the dead ends and comes out far too low, which
       is what used to make pure ocean noise look like a solid contact.
-    * Phase. The echo's carrier phase depends on its arrival time, so a
+    2.Phase:-->The echo's carrier phase depends on its arrival time, so a
       fixed-phase template only matches at some delays. Correlating
       against sine AND cosine and taking the magnitude gives the
       envelope, which is phase-independent — the textbook matched filter
@@ -154,23 +138,22 @@ def _compact_quadrature_template(freq, sigma):
     return t_sin / norm, t_cos / norm, half
 
 
-def _envelope_correlate(signal, t_sin, t_cos):
-    """Quadrature matched filter -> phase-independent envelope."""
+def EnvelopeCorrelate(signal, t_sin, t_cos):
+    """Quadrature matched filter to phase-independent envelope."""
     cs = np.correlate(signal, t_sin, mode='same')
     cc = np.correlate(signal, t_cos, mode='same')
     return np.sqrt(cs ** 2 + cc ** 2)
 
 
-class _Detector:
+class Detector:
     """One hypothesis: a band, a pulse shape, and its calibration."""
-
     def __init__(self, name, band, freq, sigma, size=None):
         self.name = name
         self.band = band
         self.freq = freq
         self.sigma = sigma
         self.size = size
-        self.t_sin, self.t_cos, self.half = _compact_quadrature_template(freq, sigma)
+        self.t_sin, self.t_cos, self.half = CompactQuadratureTemplate(freq, sigma)
 
         # Calibrate: push a clean, noiseless pulse of amplitude 1.0
         # through the exact same chain and record the peak it produces.
@@ -180,13 +163,12 @@ class _Detector:
         # filter's own loss is automatically accounted for.
         t = time_axis()
         reference = gaussian_ping(t, freq, sigma, 1.0, center=PULSE_ORIGIN_OFFSET)
-        filtered, _, _ = bandpass_filter(reference, band)
-        env = _envelope_correlate(filtered, self.t_sin, self.t_cos)
+        filtered, _, _ = BandpassFilter(reference, band)
+        env = EnvelopeCorrelate(filtered, self.t_sin, self.t_cos)
         self.unit_peak = float(np.max(env)) or 1.0
 
     def run(self, signal):
-        filtered, _residue, _spectrum = bandpass_filter(signal, self.band)
-
+        filtered, _residue, _spectrum = BandpassFilter(signal, self.band)
         # Pad before correlating so that EVERY sample position gets the
         # full template laid over it. Without this the usable lag range
         # starts `half` samples in — and for the broad, low-frequency
@@ -195,21 +177,17 @@ class _Detector:
         # outside the search window and being reported as "nothing".
         pad = self.half
         padded = np.concatenate([np.zeros(pad), filtered, np.zeros(pad)])
-        env_full = _envelope_correlate(padded, self.t_sin, self.t_cos)
+        env_full = EnvelopeCorrelate(padded, self.t_sin, self.t_cos)
         env = env_full[pad:pad + len(filtered)]
-
         n = len(env)
         # Nothing can arrive before it was transmitted, so only search
-        # from the zero-delay position onwards. A couple of samples of
-        # slack absorbs quantisation.
+        # from the zero-delay position onwards.
         lo = max(0, _MIN_LAG_SAMPLE - 3)
         hi = max(lo + 1, n)
         window = env[lo:hi]
-
         rel_peak = int(np.argmax(window))
         peak_index = lo + rel_peak
         peak_value = float(window[rel_peak])
-
         # Noise floor: the typical envelope level away from the peak.
         # The median is used rather than the mean so one loud echo cannot
         # inflate the floor it is being measured against.
@@ -220,13 +198,11 @@ class _Detector:
         floor = float(np.median(background))
         if not np.isfinite(floor) or floor < 1e-9:
             floor = 1e-9
-
         snr = peak_value / floor
-
         # peak index maps straight onto the pulse's arrival time, so the
         # delay is just that time minus where an undelayed pulse sits.
-        arrival_time = peak_index / SAMPLE_RATE
-        delay = arrival_time - PULSE_ORIGIN_OFFSET
+        arrivalTime = peak_index / SAMPLE_RATE
+        delay = arrivalTime - PULSE_ORIGIN_OFFSET
 
         return {
             'filtered': filtered,
@@ -246,21 +222,16 @@ class _Detector:
 
 # Built once at import — the calibration pass is not free.
 _SONAR_DETECTORS = [
-    _Detector(f'sonar{s}', SONAR_BAND, SONAR_FREQ, size_pulse_width(s), size=s)
+    Detector(f'sonar{s}', SONAR_BAND, SONAR_FREQ, size_pulse_width(s), size=s)
     for s in SONAR_SIZE_HYPOTHESES
 ]
-_BOMB_DETECTOR = _Detector('bomb', BOMB_BAND, BOMB_FREQ, BOMB_SIGMA)
-_HULL_DETECTOR = _Detector('hull', HULL_BAND, HULL_FREQ, HULL_SIGMA)
+_BOMB_DETECTOR = Detector('bomb', BOMB_BAND, BOMB_FREQ, BOMB_SIGMA)
+_HULL_DETECTOR = Detector('hull', HULL_BAND, HULL_FREQ, HULL_SIGMA)
 
 
 def snr_to_confidence(snr):
     """
     Map signal-to-noise ratio onto a 0..1 confidence.
-
-    A logistic in log-SNR, centred on the detection threshold: exactly at
-    threshold the meter reads 50%, comfortably above it approaches 100%,
-    and pure ocean noise sits near 0%. Always inside 0..1, so the UI can
-    print it as a percentage without producing nonsense.
     """
     s = max(float(snr), 1e-6)
     x = (np.log(s) - np.log(SNR_DETECTION_THRESHOLD)) / CONFIDENCE_SLOPE
@@ -271,7 +242,6 @@ def snr_to_confidence(snr):
 def matched_filter(filtered_signal, template):
     """
     Back-compatible cross-correlation helper.
-
     Returns: (correlation, peak_index, peak_value, estimated_delay)
     """
     template_unit = template / (np.linalg.norm(template) + 1e-10)
@@ -289,7 +259,6 @@ def matched_filter(filtered_signal, template):
 def delay_to_distance(delay, round_trip=True):
     """
     Inverse of signal_engine.distance_to_delay().
-
     An ECHO travelled out and back, so the same delay means half the
     distance that a one-way DIRECT arrival would. Getting this backwards
     is what made sonar readings and shockwave readings disagree about how
@@ -300,11 +269,10 @@ def delay_to_distance(delay, round_trip=True):
     return cells if round_trip else 2.0 * cells
 
 
-def estimate_target_size(amplitude, distance, source_amplitude=SONAR_AMPLITUDE):
+def EstimateTargetSize(amplitude, distance, source_amplitude=SONAR_AMPLITUDE):
     """
     Work backwards from how loud the echo was to how big the thing that
     produced it must be.
-
     The generator built the echo as
         amp = source_amplitude * sqrt(size / 3) / (1 + alpha * distance)
     so invert that. `amplitude` is the arriving amplitude recovered by
@@ -319,7 +287,7 @@ def estimate_target_size(amplitude, distance, source_amplitude=SONAR_AMPLITUDE):
     return REFERENCE_SHIP_SIZE * (strength ** 2)
 
 
-def classify_signal(signal, sample_rate=SAMPLE_RATE):
+def classifySignal(signal, sample_rate=SAMPLE_RATE):
     """
     Coarse energy-based check of which band carries the event.
     Kept as a sanity check alongside the matched-filter decision in
@@ -348,12 +316,10 @@ def classify_signal(signal, sample_rate=SAMPLE_RATE):
     return 'unknown'
 
 
-def process_signal(raw_signal):
+def processSignal(raw_signal):
     """
     Full DSP pipeline for one ship's received signal.
-
     Runs three independent detectors over the same recording:
-
       * SONAR channel — a bank of ping templates, one per plausible
         submarine size. The template that matches best both finds the
         echo and hints at how big the target is.
@@ -380,9 +346,7 @@ def process_signal(raw_signal):
         estimated_size       cells, best guess at the target's size
         hull_ring            bool, was a hull heard breaking up
     """
-
     signal = np.array(raw_signal, dtype=float)
-
     # ---- sonar template bank (one hypothesis per submarine size) ----
     sonar_runs = [(d, d.run(signal)) for d in _SONAR_DETECTORS]
     best_det, sonar = max(sonar_runs, key=lambda pair: pair[1]['snr'])
@@ -391,13 +355,11 @@ def process_signal(raw_signal):
     # ---- bomb blast and hull ring ----
     bomb = _BOMB_DETECTOR.run(signal)
     hull = _HULL_DETECTOR.run(signal)
-
     detected = False
     signal_type = 'unknown'
     signal_class = 'unknown'
     est_dist = est_dist_echo = est_dist_direct = None
     est_size = None
-
     # A hull ring only exists when a blast broke something, so hearing
     # one is the hit. We still want some corroboration from the blast
     # channel before calling it, otherwise a stray noise spike in the
@@ -421,7 +383,7 @@ def process_signal(raw_signal):
         est_dist_echo = delay_to_distance(ranging_delay, round_trip=True)
         est_dist = est_dist_direct
         # Ring loudness scales with the struck boat's size.
-        est_size = estimate_target_size(
+        est_size = EstimateTargetSize(
             hull['amplitude'], est_dist_direct,
             source_amplitude=HULL_AMPLITUDE,
         )
@@ -442,7 +404,7 @@ def process_signal(raw_signal):
         est_dist_echo = delay_to_distance(sonar['delay'], round_trip=True)
         est_dist_direct = delay_to_distance(sonar['delay'], round_trip=False)
         est_dist = est_dist_echo
-        est_size = estimate_target_size(sonar['amplitude'], est_dist_echo,
+        est_size = EstimateTargetSize(sonar['amplitude'], est_dist_echo,
                                         source_amplitude=SONAR_AMPLITUDE * ECHO_GAIN)
     else:
         # Nothing cleared the bar. Show the sonar channel by default, and

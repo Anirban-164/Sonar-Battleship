@@ -38,7 +38,7 @@ from game.signal_engine import (
     generate_bomb_shockwave_signals,
     generate_idle_signals,
 )
-from game.signal_processor import process_signal
+from game.signal_processor import processSignal
 
 
 # ============================================================
@@ -658,7 +658,7 @@ def api_signals(request, room_code):
         if idx_int < len(my_ships) and my_ships[idx_int].get('is_sunk', False):
             continue
 
-        processed = process_signal(sig_data['signal'])
+        processed = processSignal(sig_data['signal'])
 
         # An enemy ping sweeping past us is a DIRECT arrival, not an echo
         # off something — so the one-way reading is the correct one. The
