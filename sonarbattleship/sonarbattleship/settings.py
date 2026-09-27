@@ -144,6 +144,7 @@ STATICFILES_DIRS = [
     BASE_DIR / 'static',
     BASE_DIR / 'resources',
 ]
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Templates directory
 TEMPLATES[0]['DIRS'] = [BASE_DIR / 'templates']

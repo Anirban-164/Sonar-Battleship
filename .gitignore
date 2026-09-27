@@ -6,3 +6,5 @@
 *.pyc
 *.md
 !README.md
+*.pptx
+*.zip
