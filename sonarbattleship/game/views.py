@@ -7,6 +7,8 @@ all shared utilities are in helpers.py.
 
 import json
 import random
+import time
+from django.core.cache import cache
 
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
@@ -206,6 +208,22 @@ def api_room_state(request, room_code):
 
     enemy = get_enemy_player(room, me)
 
+    # Track last seen for this player (valid for 1 hour)
+    cache.set(f"last_seen_{me.id}", time.time(), 3600)
+
+    # Check if enemy disconnected
+    if enemy and room.status in ('placement', 'in_progress'):
+        enemy_last_seen = cache.get(f"last_seen_{enemy.id}")
+        if not enemy_last_seen:
+            # Fallback to when they joined if cache is empty
+            enemy_last_seen = enemy.created_at.timestamp()
+            
+        if (time.time() - enemy_last_seen) > 30:
+            room.status = 'finished'
+            room.winner = me
+            room.save()
+            cache.set(f"end_reason_{room.id}", f"{enemy.name} abandoned the match due to inactivity.")
+
     # Build player list
     players_data = []
     for p in room.players.all():
@@ -275,6 +293,13 @@ def api_room_state(request, room_code):
 
     my_position = get_player_position(room, me)
 
+    end_reason = cache.get(f"end_reason_{room.id}")
+    if room.status == 'finished' and not end_reason:
+        if str(room.winner_id) == str(me.id):
+            end_reason = "All enemy ships sunk!"
+        else:
+            end_reason = "Your fleet was destroyed!"
+
     return JsonResponse({
         'status': room.status,
         'grid_size': room.grid_size,
@@ -282,6 +307,7 @@ def api_room_state(request, room_code):
         'my_id': str(me.id),
         'is_my_turn': room.current_turn_id == me.id,
         'winner': str(room.winner_id) if room.winner_id else None,
+        'end_reason': end_reason,
         'my_position': my_position,
         'players': players_data,
         'my_ships': my_ships,

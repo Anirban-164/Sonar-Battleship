@@ -1408,10 +1408,10 @@
 
         if (gameState.winner === gameState.my_id) {
             title.textContent = '🏆 Victory!';
-            msg.textContent = 'You sank all enemy ships!';
+            msg.textContent = gameState.end_reason || 'You sank all enemy ships!';
         } else {
             title.textContent = '💀 Defeat';
-            msg.textContent = 'All your ships have been sunk.';
+            msg.textContent = gameState.end_reason || 'All your ships have been sunk.';
         }
         if (pollingInterval) clearInterval(pollingInterval);
     }
